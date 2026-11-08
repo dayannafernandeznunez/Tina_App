@@ -63,6 +63,8 @@ en los dos diseños.
 6. **Cuenta** (barra inferior) → pedidos de la clienta y cierre de sesión.
 7. **Panel de vendedora** (Cuenta → "Soy vendedora · ir al panel") → filtra los
    pedidos por estado y cámbialos: cada cambio queda en el historial del pedido.
+8. **Link Del Video**
+https://youtu.be/eZb26JoHPJ4
 
 ## Cómo está organizado el código
 
