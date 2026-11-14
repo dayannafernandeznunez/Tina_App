@@ -78,7 +78,8 @@ class DetallePage extends StatelessWidget {
             flexIzquierda: 5,
             flexDerecha: 6,
             izquierda: TinaFotoProducto(
-              total: 3,
+              total: vista.fotos.isEmpty ? 3 : vista.fotos.length,
+              fotos: vista.fotos,
               actual: foto,
               onCambiar: onFoto,
             ),

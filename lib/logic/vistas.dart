@@ -6,11 +6,15 @@ class ProductoVista {
     required this.producto,
     required this.categoria,
     required this.variantes,
+    this.fotos = const [],
   });
 
   final Producto producto;
   final String categoria;
   final List<VarianteProducto> variantes;
+
+  /// Direcciones de las fotos, en el orden que eligió la administradora.
+  final List<String> fotos;
 
   /// Colores distintos, en el orden en que aparecen las variantes.
   List<String> get colores => [
@@ -116,6 +120,23 @@ List<PedidoCompleto> armarPedidos({
   final clientePorId = {for (final c in clientes) c.idCliente: c};
   final usuarioPorId = {for (final u in usuarios) u.idUsuario: u};
 
+  // Si la administradora borra un artículo, los pedidos que lo incluían siguen
+  // mostrándose: el precio y la cantidad quedaron guardados en el pedido.
+  LineaPedido lineaDe(DetallePedido d) {
+    final variante = variantePorId[d.idVariante];
+    final producto = variante == null
+        ? null
+        : productoPorId[variante.idProducto];
+    return LineaPedido(
+      nombre: producto?.nombre ?? 'Artículo que ya no está en la tienda',
+      color: variante?.color ?? '',
+      talla: variante?.talla ?? 'Única',
+      cantidad: d.cantidad,
+      precioUnitario: d.precioUnitario,
+      subtotal: d.subtotal,
+    );
+  }
+
   final ordenados = [...pedidos]
     ..sort((a, b) {
       final porFecha = b.fecha.compareTo(a.fecha);
@@ -138,15 +159,7 @@ List<PedidoCompleto> armarPedidos({
             for (final d in detalles.where(
               (d) => d.idPedido == pedido.idPedido,
             ))
-              LineaPedido(
-                nombre: productoPorId[variantePorId[d.idVariante]!.idProducto]!
-                    .nombre,
-                color: variantePorId[d.idVariante]!.color,
-                talla: variantePorId[d.idVariante]!.talla,
-                cantidad: d.cantidad,
-                precioUnitario: d.precioUnitario,
-                subtotal: d.subtotal,
-              ),
+              lineaDe(d),
           ],
           envio: envios.firstWhere((e) => e.idPedido == pedido.idPedido),
           pago: pago,

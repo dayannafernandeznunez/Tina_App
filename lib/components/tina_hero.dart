@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../theme/tina_tema.dart';
 import '../utils/adaptable.dart';
 import 'estrella_tina.dart';
+import 'tina_imagen_red.dart';
 
 /// Encabezado de la portada: el eslogan sobre fondo naranja con círculos y
 /// estrellas.
@@ -12,7 +13,12 @@ class TinaHero extends StatelessWidget {
     required this.linea1,
     required this.linea2,
     required this.subtitulo,
+    this.foto,
   });
+
+  /// Foto de la portada que sube la administradora. Sin ella se ve el diseño
+  /// de círculos y estrellas.
+  final String? foto;
 
   final String linea1;
   final String linea2;
@@ -36,6 +42,22 @@ class TinaHero extends StatelessWidget {
         child: Stack(
           clipBehavior: Clip.none,
           children: [
+            if (foto != null) ...[
+              Positioned.fill(child: TinaImagenRed(url: foto!, radio: 30)),
+              // Velo naranja para que el texto se lea sobre cualquier foto.
+              Positioned.fill(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        TinaColores.naranja.withValues(alpha: 0.85),
+                        TinaColores.naranja.withValues(alpha: 0.25),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
             Positioned(
               right: -70,
               top: -80,

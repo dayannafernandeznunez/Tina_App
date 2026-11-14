@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../components/components.dart';
+import '../data/administradora.dart';
+import '../data/catalogo.dart';
+import '../data/sesion.dart';
 import '../data/datos_simulados.dart';
 import '../logic/calculos.dart';
 import '../logic/validaciones.dart';
@@ -15,6 +18,8 @@ import '../pages/inicio_page.dart';
 import '../pages/lista_page.dart';
 import '../pages/login_page.dart';
 import '../pages/panel_page.dart';
+import '../pages/panel_fotos_articulos_page.dart';
+import '../pages/panel_fotos_sitio_page.dart';
 import '../pages/pedido_page.dart';
 import '../theme/tina_tema.dart';
 import '../utils/adaptable.dart';
@@ -41,7 +46,29 @@ enum Ruta {
 /// solo muestran lo que reciben y reportan cada interacción con un callback;
 /// ninguna guarda datos de la app por su cuenta.
 class TinaScreen extends StatefulWidget {
-  const TinaScreen({super.key});
+  const TinaScreen({
+    super.key,
+    this.catalogo,
+    this.sesiones,
+    this.admin,
+    this.selectorFotos = const SelectorFotosDispositivo(),
+  });
+
+  /// De dónde se lee el catálogo (categorías, productos, variantes, promociones
+  /// y fotos). Si es `null`, la app trabaja solo con los datos simulados.
+  final CatalogoRepositorio? catalogo;
+
+  /// El inicio de sesión de la tienda, igual para clientas y administradora.
+  /// Si es `null`, la app funciona en modo de ejemplo: las cuentas son de
+  /// mentira y el panel se abre sin cuenta.
+  final SesionRepositorio? sesiones;
+
+  /// Lo que solo puede hacer la administradora: cambiar fotos. Si es `null`,
+  /// no se puede cambiar ninguna foto.
+  final AdministradoraRepositorio? admin;
+
+  /// Cómo se eligen las fotos en el dispositivo.
+  final SelectorFotos selectorFotos;
 
   @override
   State<TinaScreen> createState() => _TinaScreenState();
@@ -49,11 +76,24 @@ class TinaScreen extends StatefulWidget {
 
 class _TinaScreenState extends State<TinaScreen> {
   // ---------------------------------------------------------------- datos
-  // Copias de los datos simulados: aquí es donde cambian al usar la app.
-  final List<Categoria> _categorias = [...DatosSimulados.categorias];
-  final List<Producto> _productos = [...DatosSimulados.productos];
-  final List<Promocion> _promociones = [...DatosSimulados.promociones];
+  // El catálogo arranca con los datos simulados y, si hay un repositorio, se
+  // reemplaza por el de Supabase apenas llega. Los pedidos siguen simulados.
+  List<Categoria> _categorias = [...DatosSimulados.categorias];
+  List<Producto> _productos = [...DatosSimulados.productos];
+  List<Promocion> _promociones = [...DatosSimulados.promociones];
+  List<ImagenProducto> _imagenes = [];
+  List<AjusteSitio> _ajustesSitio = [];
   final List<Usuario> _usuarios = [...DatosSimulados.usuarios];
+
+  bool _cargandoCatalogo = false;
+
+  // ------------------------------------------------- administradora y fotos
+  bool _esAdmin = false;
+  bool _authOcupado = false;
+  SeccionPanel _seccionPanel = SeccionPanel.pedidos;
+  int? _idProductoFotos;
+  bool _fotosOcupado = false;
+  String? _claveSitioOcupada;
 
   List<VarianteProducto> _variantes = [...DatosSimulados.variantes];
   List<Cliente> _clientes = [...DatosSimulados.clientes];
@@ -130,6 +170,13 @@ class _TinaScreenState extends State<TinaScreen> {
       for (final v in _variantes)
         if (v.idProducto == p.idProducto) v,
     ],
+    fotos: [
+      for (final i in ([
+        for (final i in _imagenes)
+          if (i.idProducto == p.idProducto) i,
+      ]..sort((a, b) => a.orden.compareTo(b.orden))))
+        i.url,
+    ],
   );
 
   List<ProductoVista> _vistas({String? categoria}) => [
@@ -152,6 +199,324 @@ class _TinaScreenState extends State<TinaScreen> {
     historial: _historial,
     usuarios: _usuarios,
   );
+
+  // --------------------------------------------------------------- catálogo
+  @override
+  void initState() {
+    super.initState();
+    if (widget.catalogo != null) {
+      _cargandoCatalogo = true;
+      _cargarCatalogo();
+    }
+    if (widget.sesiones != null) {
+      // Con cuentas reales no hay clientas ni pedidos de ejemplo: los pedidos
+      // reales llegarán con la conexión de pedidos.
+      _clientes = [];
+      _pedidos = [];
+      _detalles = [];
+      _envios = [];
+      _pagos = [];
+      _comprobantes = [];
+      _historial = [];
+      _restaurarSesion();
+    }
+  }
+
+  Future<void> _cargarCatalogo() async {
+    try {
+      final catalogo = await widget.catalogo!.cargar();
+      if (!mounted) return;
+      setState(() {
+        _categorias = [...catalogo.categorias];
+        _productos = [...catalogo.productos];
+        _variantes = [...catalogo.variantes];
+        _promociones = [...catalogo.promociones];
+        _imagenes = [...catalogo.imagenes];
+        _ajustesSitio = [...catalogo.ajustesSitio];
+        _cargandoCatalogo = false;
+      });
+    } catch (error) {
+      debugPrint('No se pudo leer el catálogo de Supabase: $error');
+      if (!mounted) return;
+      setState(() => _cargandoCatalogo = false);
+      _aviso('No pudimos conectar con la tienda. Mostramos datos de ejemplo.');
+    }
+  }
+
+  // ------------------------------------------- administradora y sus fotos
+  /// Lugares del sitio que la tienda ya muestra.
+  static const Set<String> _clavesSitioEnUso = {'portada_inicio'};
+
+  /// Sin cuentas reales (modo de ejemplo) el panel se abre sin cuenta; con
+  /// ellas, solo si quien entró es administradora.
+  bool get _puedeVerPanel => widget.sesiones == null || _esAdmin;
+
+  String? _urlSitio(String clave) {
+    for (final a in _ajustesSitio) {
+      if (a.clave == clave && a.tieneFoto) return a.url;
+    }
+    return null;
+  }
+
+  int get _productoFotos =>
+      _idProductoFotos ??
+      (_productos.isEmpty ? 0 : _productos.first.idProducto);
+
+  List<ImagenProducto> get _fotosDelProducto => [
+    for (final i in _imagenes)
+      if (i.idProducto == _productoFotos) i,
+  ]..sort((a, b) => a.orden.compareTo(b.orden));
+
+  Future<void> _restaurarSesion() async {
+    final activa = await widget.sesiones!.restaurar();
+    if (!mounted || activa == null) return;
+    setState(() {
+      _esAdmin = activa.esAdministradora;
+      _sesion = activa.cliente;
+      _modo = ModoCompra.cuenta;
+      _clientes = [
+        for (final c in _clientes)
+          if (c.idCliente != activa.cliente.idCliente) c,
+        activa.cliente,
+      ];
+    });
+  }
+
+  /// Modo de ejemplo: el enlace de la página de ingreso abre el panel.
+  void _irAPanel() {
+    setState(() => _seccionPanel = SeccionPanel.pedidos);
+    _empujar(Ruta.panel);
+  }
+
+  Future<void> _entrarConCuenta(String correo) async {
+    final repo = widget.sesiones!;
+    setState(() {
+      _authOcupado = true;
+      _authError = null;
+    });
+    try {
+      if (_registro) {
+        final resultado = await repo.registrar(
+          nombre: _authNombre.trim(),
+          correo: correo,
+          clave: _authClave,
+        );
+        if (!mounted) return;
+        final activa = resultado.sesion;
+        if (activa == null) {
+          setState(() {
+            _authOcupado = false;
+            _registro = false;
+            _authClave = '';
+          });
+          _aviso(
+            'Te enviamos un correo para confirmar tu cuenta. Después inicia sesión.',
+          );
+          return;
+        }
+        _abrirSesion(activa);
+      } else {
+        _abrirSesion(await repo.iniciarSesion(correo, _authClave));
+      }
+    } on ErrorSesion catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _authOcupado = false;
+        _authError = e.mensaje;
+      });
+    } catch (error) {
+      debugPrint('Error al entrar: $error');
+      if (!mounted) return;
+      setState(() {
+        _authOcupado = false;
+        _authError = 'No pudimos entrar. Inténtalo de nuevo.';
+      });
+    }
+  }
+
+  /// Quien entra va a donde le toca: la administradora al panel, las clientas
+  /// a la tienda (o de vuelta a su compra).
+  void _abrirSesion(SesionActiva activa) {
+    final cliente = activa.cliente;
+    setState(() {
+      _authOcupado = false;
+      _esAdmin = activa.esAdministradora;
+      _clientes = [
+        for (final c in _clientes)
+          if (c.idCliente != cliente.idCliente) c,
+        cliente,
+      ];
+    });
+    if (activa.esAdministradora) {
+      setState(() {
+        _sesion = cliente;
+        _modo = ModoCompra.cuenta;
+        _authNombre = '';
+        _authCorreo = '';
+        _authClave = '';
+        _authError = null;
+        _registro = false;
+        _loginDesdeCheckout = false;
+        _seccionPanel = SeccionPanel.pedidos;
+        _pila = [Ruta.inicio, Ruta.panel];
+      });
+      _aviso('Hola, ${cliente.nombre}.');
+      return;
+    }
+    _completarEntrada(cliente);
+  }
+
+  /// Corre un cambio de fotos mostrando "un momento" y avisando el resultado.
+  /// Una sola acción a la vez.
+  Future<void> _accionFotos(
+    Future<void> Function() accion, {
+    required String exito,
+    String? clave,
+  }) async {
+    if (_fotosOcupado) return;
+    setState(() {
+      _fotosOcupado = true;
+      _claveSitioOcupada = clave;
+    });
+    try {
+      await accion();
+      if (mounted) _aviso(exito);
+    } on ErrorAdministradora catch (e) {
+      if (mounted) _aviso(e.mensaje);
+    } catch (error) {
+      debugPrint('No se pudo guardar el cambio de fotos: $error');
+      if (mounted) _aviso('No se pudo guardar el cambio. Inténtalo de nuevo.');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _fotosOcupado = false;
+          _claveSitioOcupada = null;
+        });
+      }
+    }
+  }
+
+  bool _hayAdmin() {
+    if (widget.admin != null) return true;
+    _aviso('Para cambiar fotos hace falta la conexión con la tienda.');
+    return false;
+  }
+
+  Future<FotoElegida?> _elegirFoto() async {
+    final foto = await widget.selectorFotos.elegir();
+    if (foto == null) return null;
+    final problema = foto.problema;
+    if (problema != null) {
+      if (mounted) _aviso(problema);
+      return null;
+    }
+    return foto;
+  }
+
+  Future<void> _subirFotoProducto() async {
+    if (!_hayAdmin()) return;
+    final foto = await _elegirFoto();
+    if (foto == null) return;
+    final idProducto = _productoFotos;
+    final fotos = _fotosDelProducto;
+    final orden = (fotos.isEmpty ? 0 : fotos.last.orden) + 1;
+    await _accionFotos(() async {
+      final nueva = await widget.admin!.subirFotoProducto(
+        idProducto: idProducto,
+        foto: foto,
+        orden: orden,
+      );
+      setState(() => _imagenes = [..._imagenes, nueva]);
+    }, exito: 'Foto subida.');
+  }
+
+  Future<void> _aplicarOrdenFotos(List<ImagenProducto> enOrden) {
+    return _accionFotos(() async {
+      await widget.admin!.ordenarFotosProducto(enOrden);
+      final nuevos = {
+        for (var i = 0; i < enOrden.length; i++) enOrden[i].idImagen: i + 1,
+      };
+      setState(() {
+        _imagenes = [
+          for (final f in _imagenes)
+            nuevos.containsKey(f.idImagen)
+                ? f.copyWith(orden: nuevos[f.idImagen])
+                : f,
+        ];
+      });
+    }, exito: 'Orden guardado.');
+  }
+
+  Future<void> _moverFoto(ImagenProducto foto, int paso) async {
+    if (!_hayAdmin()) return;
+    final lista = [..._fotosDelProducto];
+    final de = lista.indexWhere((f) => f.idImagen == foto.idImagen);
+    final a = de + paso;
+    if (de < 0 || a < 0 || a >= lista.length) return;
+    lista.insert(a, lista.removeAt(de));
+    await _aplicarOrdenFotos(lista);
+  }
+
+  Future<void> _hacerPrincipal(ImagenProducto foto) async {
+    if (!_hayAdmin()) return;
+    final lista = [
+      foto,
+      for (final f in _fotosDelProducto)
+        if (f.idImagen != foto.idImagen) f,
+    ];
+    await _aplicarOrdenFotos(lista);
+  }
+
+  Future<void> _borrarFotoProducto(ImagenProducto foto) async {
+    if (!_hayAdmin()) return;
+    await _accionFotos(() async {
+      await widget.admin!.borrarFotoProducto(foto);
+      setState(() {
+        _imagenes = [
+          for (final f in _imagenes)
+            if (f.idImagen != foto.idImagen) f,
+        ];
+      });
+    }, exito: 'Foto borrada.');
+  }
+
+  void _reemplazarAjuste(AjusteSitio nuevo) {
+    setState(() {
+      _ajustesSitio = [
+        for (final a in _ajustesSitio) a.clave == nuevo.clave ? nuevo : a,
+      ];
+    });
+  }
+
+  Future<void> _subirFotoSitio(String clave) async {
+    if (!_hayAdmin()) return;
+    final foto = await _elegirFoto();
+    if (foto == null) return;
+    final ajuste = _ajustesSitio.firstWhere((a) => a.clave == clave);
+    await _accionFotos(
+      () async {
+        _reemplazarAjuste(
+          await widget.admin!.subirFotoSitio(ajuste: ajuste, foto: foto),
+        );
+      },
+      clave: clave,
+      exito: _clavesSitioEnUso.contains(clave)
+          ? 'Foto guardada. Ya se ve en la tienda.'
+          : 'Foto guardada.',
+    );
+  }
+
+  Future<void> _quitarFotoSitio(String clave) async {
+    if (!_hayAdmin()) return;
+    final ajuste = _ajustesSitio.firstWhere((a) => a.clave == clave);
+    await _accionFotos(
+      () async {
+        _reemplazarAjuste(await widget.admin!.quitarFotoSitio(ajuste));
+      },
+      clave: clave,
+      exito: 'Foto quitada.',
+    );
+  }
 
   // -------------------------------------------------------------- avisos
   void _aviso(String texto) {
@@ -562,6 +927,12 @@ class _TinaScreenState extends State<TinaScreen> {
       return;
     }
 
+    // Con cuentas reales, Supabase decide; abajo sigue el modo de ejemplo.
+    if (widget.sesiones != null) {
+      _entrarConCuenta(correo);
+      return;
+    }
+
     final existente = _clientes
         .where((c) => c.correo.toLowerCase() == correo.toLowerCase())
         .firstOrNull;
@@ -600,6 +971,12 @@ class _TinaScreenState extends State<TinaScreen> {
       cliente = existente;
     }
 
+    _completarEntrada(cliente);
+  }
+
+  /// Lo que pasa cuando una clienta ya entró: va a la tienda o vuelve a su
+  /// compra.
+  void _completarEntrada(Cliente cliente) {
     setState(() {
       _sesion = cliente;
       _modo = ModoCompra.cuenta;
@@ -637,8 +1014,15 @@ class _TinaScreenState extends State<TinaScreen> {
   }
 
   void _cerrarSesion() {
+    final repo = widget.sesiones;
+    if (repo != null) {
+      repo.cerrarSesion().catchError((Object error) {
+        debugPrint('Error al cerrar la sesión: $error');
+      });
+    }
     setState(() {
       _sesion = null;
+      _esAdmin = false;
       _modo = ModoCompra.invitada;
       _introPendiente = false;
     });
@@ -738,6 +1122,7 @@ class _TinaScreenState extends State<TinaScreen> {
   Page<void> _pagina(Ruta ruta) {
     final Widget hijo = switch (ruta) {
       Ruta.inicio => InicioPage(
+        fotoPortada: _urlSitio('portada_inicio'),
         productos: _vistas(),
         categorias: _nombresCategorias,
         promociones: _promociones,
@@ -813,25 +1198,7 @@ class _TinaScreenState extends State<TinaScreen> {
         onCarrito: _irCarrito,
       ),
       Ruta.confirmacion => _confirmacion(),
-      Ruta.login => LoginPage(
-        onLogo: _irInicio,
-        registro: _registro,
-        nombre: _authNombre,
-        correo: _authCorreo,
-        clave: _authClave,
-        error: _authError,
-        textoPromocion: _promociones
-            .firstWhere((p) => p.tipo == 'primera_compra')
-            .nombre,
-        unidadesCarrito: _unidades,
-        onToggle: _alternarRegistro,
-        onCampo: _escribirAuth,
-        onEntrar: _entrar,
-        onVendedora: () => _empujar(Ruta.panel),
-        onAtras: _atrasDeLogin,
-        onCarrito: _irCarrito,
-        onNav: _onNav,
-      ),
+      Ruta.login => _login(),
       Ruta.cuenta => CuentaPage(
         onLogo: _irInicio,
         nombre: _sesion?.nombre ?? '',
@@ -843,11 +1210,12 @@ class _TinaScreenState extends State<TinaScreen> {
         unidadesCarrito: _unidades,
         onPedido: _verPedido,
         onCerrarSesion: _cerrarSesion,
+        onPanel: _esAdmin ? _irAPanel : null,
         onAtras: _irInicio,
         onCarrito: _irCarrito,
         onNav: _onNav,
       ),
-      Ruta.panel => _panel(),
+      Ruta.panel => _puedeVerPanel ? _panel() : _login(),
       Ruta.pedido => PedidoPage(
         pedido: _pedidosCompletos.firstWhere(
           (p) => p.pedido.idPedido == _idPedidoVer,
@@ -861,6 +1229,30 @@ class _TinaScreenState extends State<TinaScreen> {
       child: hijo,
     );
   }
+
+  Widget _login() => LoginPage(
+    onLogo: _irInicio,
+    registro: _registro,
+    nombre: _authNombre,
+    correo: _authCorreo,
+    clave: _authClave,
+    error: _authError,
+    textoPromocion: _promociones
+        .firstWhere((p) => p.tipo == 'primera_compra')
+        .nombre,
+    unidadesCarrito: _unidades,
+    onToggle: _alternarRegistro,
+    onCampo: _escribirAuth,
+    onEntrar: _entrar,
+    // Con cuentas reales no hay acceso aparte: la administradora entra
+    // por este mismo ingreso y va directo a su panel.
+    onVendedora: widget.sesiones == null ? _irAPanel : null,
+    ocupado: _authOcupado,
+    mostrarPrueba: widget.sesiones == null,
+    onAtras: _atrasDeLogin,
+    onCarrito: _irCarrito,
+    onNav: _onNav,
+  );
 
   Widget _confirmacion() {
     final completo = _pedidosCompletos.firstWhere(
@@ -881,23 +1273,54 @@ class _TinaScreenState extends State<TinaScreen> {
   }
 
   Widget _panel() {
-    final todos = _pedidosCompletos;
-    return PanelPage(
-      pedidos: [
-        for (final p in todos)
-          if (_filtro == null || p.pedido.estadoActual == _filtro) p,
-      ],
-      totalPedidos: todos.length,
-      conteoPorEstado: {
-        for (final e in EstadoPedido.values)
-          e: todos.where((p) => p.pedido.estadoActual == e).length,
-      },
-      filtro: _filtro,
-      onFiltro: (e) => setState(() => _filtro = e),
-      onCambiarEstado: _cambiarEstado,
-      onPedido: _verPedido,
-      onVerTienda: _irInicio,
-    );
+    switch (_seccionPanel) {
+      case SeccionPanel.pedidos:
+        final todos = _pedidosCompletos;
+        return PanelPage(
+          pedidos: [
+            for (final p in todos)
+              if (_filtro == null || p.pedido.estadoActual == _filtro) p,
+          ],
+          totalPedidos: todos.length,
+          conteoPorEstado: {
+            for (final e in EstadoPedido.values)
+              e: todos.where((p) => p.pedido.estadoActual == e).length,
+          },
+          filtro: _filtro,
+          onFiltro: (e) => setState(() => _filtro = e),
+          onCambiarEstado: _cambiarEstado,
+          onPedido: _verPedido,
+          onVerTienda: _irInicio,
+          onSeccion: (s) => setState(() => _seccionPanel = s),
+          onSalir: widget.sesiones == null ? null : _cerrarSesion,
+        );
+      case SeccionPanel.fotosArticulos:
+        return PanelFotosArticulosPage(
+          productos: _productos,
+          idProducto: _productoFotos,
+          fotos: _fotosDelProducto,
+          ocupado: _fotosOcupado,
+          onSeccion: (s) => setState(() => _seccionPanel = s),
+          onElegirProducto: (id) => setState(() => _idProductoFotos = id),
+          onSubir: _subirFotoProducto,
+          onMover: _moverFoto,
+          onPrincipal: _hacerPrincipal,
+          onBorrar: _borrarFotoProducto,
+          onSalir: _cerrarSesion,
+          onVerTienda: _irInicio,
+        );
+      case SeccionPanel.fotosSitio:
+        return PanelFotosSitioPage(
+          ajustes: _ajustesSitio,
+          clavesEnUso: _clavesSitioEnUso,
+          claveOcupada: _fotosOcupado ? (_claveSitioOcupada ?? '') : null,
+          onSeccion: (s) => setState(() => _seccionPanel = s),
+          onSubir: _subirFotoSitio,
+          onQuitar: _quitarFotoSitio,
+          onSalir: _cerrarSesion,
+          onVerTienda: _irInicio,
+        );
+    }
   }
 
   @override
@@ -923,6 +1346,16 @@ class _TinaScreenState extends State<TinaScreen> {
             ),
           ),
         ),
+        if (_cargandoCatalogo)
+          const Positioned.fill(
+            child: ColoredBox(
+              key: ValueKey('cargando-catalogo'),
+              color: TinaColores.crema,
+              child: Center(
+                child: CircularProgressIndicator(color: TinaColores.naranja),
+              ),
+            ),
+          ),
         if (mostrarIntro)
           Positioned.fill(
             child: TinaIntro(

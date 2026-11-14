@@ -15,6 +15,7 @@ class CuentaPage extends StatelessWidget {
     required this.unidadesCarrito,
     required this.onPedido,
     required this.onCerrarSesion,
+    this.onPanel,
     required this.onAtras,
     required this.onCarrito,
     required this.onLogo,
@@ -27,6 +28,9 @@ class CuentaPage extends StatelessWidget {
   final int unidadesCarrito;
   final ValueChanged<int> onPedido;
   final VoidCallback onCerrarSesion;
+
+  /// Va al panel de la vendedora. Solo lo recibe la administradora.
+  final VoidCallback? onPanel;
   final VoidCallback onAtras;
   final VoidCallback onCarrito;
   final VoidCallback onLogo;
@@ -66,6 +70,20 @@ class CuentaPage extends StatelessWidget {
             correo,
             style: TinaTipografia.estilo(tamano: 14, color: TinaColores.marron),
           ),
+          if (onPanel != null) ...[
+            const SizedBox(height: 18),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 360),
+                child: TinaBoton(
+                  key: const ValueKey('ir-panel-cuenta'),
+                  etiqueta: 'Ir al panel de vendedora',
+                  onPressed: onPanel!,
+                ),
+              ),
+            ),
+          ],
           const SizedBox(height: 26),
           Text(
             'Mis pedidos',

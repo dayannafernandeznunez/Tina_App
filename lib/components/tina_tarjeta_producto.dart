@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../theme/tina_tema.dart';
 import 'tina_hover.dart';
+import 'tina_imagen_red.dart';
 
 /// Tarjeta de un producto en las listas: foto, categoría, nombre, precio y
 /// puntos con los colores disponibles. El prototipo pinta un degradado de
@@ -14,7 +15,11 @@ class TinaTarjetaProducto extends StatelessWidget {
     required this.categoria,
     required this.colores,
     required this.onTap,
+    this.foto,
   });
+
+  /// Dirección de la foto principal. Sin foto se ve el degradado de marca.
+  final String? foto;
 
   final String nombre;
   final String precio;
@@ -63,6 +68,10 @@ class TinaTarjetaProducto extends StatelessWidget {
                     ),
                     child: Stack(
                       children: [
+                        if (foto != null)
+                          Positioned.fill(
+                            child: TinaImagenRed(url: foto!, radio: 26),
+                          ),
                         Positioned(
                           top: 10,
                           left: 10,

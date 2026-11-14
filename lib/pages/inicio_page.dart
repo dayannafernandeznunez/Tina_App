@@ -18,7 +18,11 @@ class InicioPage extends StatelessWidget {
     required this.onCarrito,
     required this.onLogo,
     required this.onNav,
+    this.fotoPortada,
   });
+
+  /// Foto de la portada que sube la administradora (puede no haber ninguna).
+  final String? fotoPortada;
 
   final List<ProductoVista> productos;
   final List<String> categorias;
@@ -42,7 +46,8 @@ class InicioPage extends StatelessWidget {
       onLogo: onLogo,
       cuerpo: TinaLista(
         children: [
-          const TinaHero(
+          TinaHero(
+            foto: fotoPortada,
             linea1: 'Tan latinas',
             linea2: 'como tú',
             subtitulo: 'Accesorios hechos a mano, uno por uno.',

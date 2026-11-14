@@ -20,6 +20,8 @@ class PanelPage extends StatelessWidget {
     required this.onCambiarEstado,
     required this.onPedido,
     required this.onVerTienda,
+    required this.onSeccion,
+    this.onSalir,
   });
 
   /// Pedidos ya filtrados.
@@ -31,6 +33,10 @@ class PanelPage extends StatelessWidget {
   final void Function(int idPedido, EstadoPedido nuevo) onCambiarEstado;
   final ValueChanged<int> onPedido;
   final VoidCallback onVerTienda;
+  final ValueChanged<SeccionPanel> onSeccion;
+
+  /// Cerrar la sesión de administradora; `null` cuando no hay sesión real.
+  final VoidCallback? onSalir;
 
   @override
   Widget build(BuildContext context) {
@@ -84,6 +90,11 @@ class PanelPage extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 14),
+          TinaPanelSecciones(
+            activa: SeccionPanel.pedidos,
+            onSeccion: onSeccion,
+          ),
+          const SizedBox(height: 16),
           if (esEscritorio(context))
             Wrap(spacing: 8, runSpacing: 8, children: chips)
           else
@@ -128,10 +139,21 @@ class PanelPage extends StatelessWidget {
             alignment: Alignment.centerLeft,
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 360),
-              child: TinaBoton(
-                etiqueta: 'Ver tienda',
-                variante: VarianteBoton.secundario,
-                onPressed: onVerTienda,
+              child: Column(
+                spacing: 12,
+                children: [
+                  TinaBoton(
+                    etiqueta: 'Ver tienda',
+                    variante: VarianteBoton.secundario,
+                    onPressed: onVerTienda,
+                  ),
+                  if (onSalir != null)
+                    TinaBoton(
+                      etiqueta: 'Cerrar sesión',
+                      variante: VarianteBoton.secundario,
+                      onPressed: onSalir!,
+                    ),
+                ],
               ),
             ),
           ),

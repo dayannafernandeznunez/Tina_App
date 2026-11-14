@@ -40,6 +40,7 @@ class TinaGrillaProductos extends StatelessWidget {
                   precio: formatoPesos(p.producto.precio),
                   categoria: p.categoria,
                   colores: [for (final c in p.colores) colorDeProducto(c)],
+                  foto: p.fotos.isEmpty ? null : p.fotos.first,
                   onTap: () => onProducto(p.producto.idProducto),
                 ),
               ),

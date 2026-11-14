@@ -17,7 +17,9 @@ class LoginPage extends StatelessWidget {
     required this.onToggle,
     required this.onCampo,
     required this.onEntrar,
-    required this.onVendedora,
+    this.onVendedora,
+    this.ocupado = false,
+    this.mostrarPrueba = true,
     required this.onAtras,
     required this.onCarrito,
     required this.onLogo,
@@ -34,7 +36,16 @@ class LoginPage extends StatelessWidget {
   final VoidCallback onToggle;
   final void Function(String clave, String valor) onCampo;
   final VoidCallback onEntrar;
-  final VoidCallback onVendedora;
+
+  /// Enlace al panel de la vendedora. `null` lo oculta: con cuentas reales,
+  /// la vendedora entra por su propia dirección y las clientas no lo ven.
+  final VoidCallback? onVendedora;
+
+  /// Hay un ingreso o registro en marcha.
+  final bool ocupado;
+
+  /// Muestra la pista de la cuenta de ejemplo (solo en el modo de ejemplo).
+  final bool mostrarPrueba;
   final VoidCallback onAtras;
   final VoidCallback onCarrito;
   final VoidCallback onLogo;
@@ -117,8 +128,12 @@ class LoginPage extends StatelessWidget {
           ],
           const SizedBox(height: 22),
           TinaBoton(
-            etiqueta: registro ? 'Crear cuenta' : 'Iniciar sesión',
-            onPressed: onEntrar,
+            etiqueta: ocupado
+                ? 'Un momento…'
+                : registro
+                ? 'Crear cuenta'
+                : 'Iniciar sesión',
+            onPressed: ocupado ? () {} : onEntrar,
           ),
           const SizedBox(height: 14),
           Wrap(
@@ -155,7 +170,7 @@ class LoginPage extends StatelessWidget {
               ),
             ],
           ),
-          if (!registro)
+          if (!registro && mostrarPrueba)
             Padding(
               padding: const EdgeInsets.only(top: 4),
               child: Text(
@@ -168,32 +183,36 @@ class LoginPage extends StatelessWidget {
                 ),
               ),
             ),
-          const SizedBox(height: 18),
-          const Divider(color: TinaColores.dorado, thickness: 1),
-          const SizedBox(height: 8),
-          Center(
-            child: TinaHover(
-              builder: (context, encima) => GestureDetector(
-                key: const ValueKey('ir-panel'),
-                behavior: HitTestBehavior.opaque,
-                onTap: onVendedora,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    vertical: 10,
-                    horizontal: 12,
-                  ),
-                  child: Text(
-                    'Soy vendedora · ir al panel',
-                    style: TinaTipografia.estilo(
-                      tamano: 14,
-                      peso: FontWeight.w800,
-                      color: encima ? TinaColores.naranja : TinaColores.marron,
-                    ).copyWith(decoration: TextDecoration.underline),
+          if (onVendedora != null) ...[
+            const SizedBox(height: 18),
+            const Divider(color: TinaColores.dorado, thickness: 1),
+            const SizedBox(height: 8),
+            Center(
+              child: TinaHover(
+                builder: (context, encima) => GestureDetector(
+                  key: const ValueKey('ir-panel'),
+                  behavior: HitTestBehavior.opaque,
+                  onTap: onVendedora,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 10,
+                      horizontal: 12,
+                    ),
+                    child: Text(
+                      'Soy vendedora · ir al panel',
+                      style: TinaTipografia.estilo(
+                        tamano: 14,
+                        peso: FontWeight.w800,
+                        color: encima
+                            ? TinaColores.naranja
+                            : TinaColores.marron,
+                      ).copyWith(decoration: TextDecoration.underline),
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
+          ],
         ],
       ),
     );

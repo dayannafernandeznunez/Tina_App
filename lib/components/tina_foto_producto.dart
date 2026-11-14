@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../theme/tina_tema.dart';
 import 'tina_hover.dart';
 import 'estrella_tina.dart';
+import 'tina_imagen_red.dart';
 
 /// Galería de fotos de un producto con flechas y puntos. El prototipo pinta un
 /// degradado de marca distinto por foto en lugar de la imagen real.
@@ -12,7 +13,11 @@ class TinaFotoProducto extends StatelessWidget {
     required this.total,
     required this.actual,
     required this.onCambiar,
+    this.fotos = const [],
   });
+
+  /// Direcciones de las fotos reales. Si está vacía se muestra el degradado.
+  final List<String> fotos;
 
   final int total;
   final int actual;
@@ -58,25 +63,34 @@ class TinaFotoProducto extends StatelessWidget {
             ),
             child: Stack(
               children: [
-                Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    spacing: 8,
-                    children: [
-                      const EstrellaTina(
-                        tamano: 34,
-                        color: TinaColores.durazno,
-                      ),
-                      Text(
-                        'Foto ${actual + 1} de $total',
-                        style: TinaTipografia.serif(
-                          tamano: 22,
-                          color: TinaColores.crema,
+                if (fotos.isNotEmpty)
+                  Positioned.fill(
+                    child: TinaImagenRed(
+                      key: ValueKey('foto-$actual'),
+                      url: fotos[actual % fotos.length],
+                      radio: 28,
+                    ),
+                  )
+                else
+                  Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      spacing: 8,
+                      children: [
+                        const EstrellaTina(
+                          tamano: 34,
+                          color: TinaColores.durazno,
                         ),
-                      ),
-                    ],
+                        Text(
+                          'Foto ${actual + 1} de $total',
+                          style: TinaTipografia.serif(
+                            tamano: 22,
+                            color: TinaColores.crema,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
                 if (total > 1) ...[
                   Positioned(
                     left: 12,
