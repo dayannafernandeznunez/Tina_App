@@ -9,7 +9,7 @@ comprobantes, envíos, historial).
 
 | | Estado |
 |---|---|
-| Catálogo (categorías, productos, variantes, promociones) | **Real**: se lee de Supabase |
+| Catálogo (categorías, productos, variantes con stock, promociones) | **Real**: se lee de Supabase y la administradora lo edita desde el panel |
 | Fotos de artículos y del sitio | **Reales**: las sube la administradora desde el panel y las ve todo el mundo |
 | Cuentas e ingreso (clientas y administradora) | **Reales**: Supabase Auth, un solo ingreso para todas |
 | Pedidos, pagos, comprobantes y envíos | **Simulados** en memoria: aún no se guardan en la nube |
@@ -64,18 +64,25 @@ Hay **un solo ingreso** (Cuenta → Iniciar sesión) para clientas y administrad
 - Las clientas se registran desde el mismo formulario. Si Supabase tiene activada
   la confirmación de correo, la app avisa que hay que confirmarlo.
 
-El panel tiene tres secciones:
+El panel tiene cuatro secciones:
 
 1. **Pedidos:** filtra por estado y cámbialos; cada cambio queda en el historial.
-2. **Fotos de artículos:** elige un artículo; sube, ordena, haz principal o borra
+2. **Productos e inventario:** lista todos los productos con su stock (avisa
+   cuando queda poco o está agotado) y permite mostrarlos u ocultarlos con un
+   interruptor. Desde aquí se **crea un producto nuevo** o se edita uno: nombre,
+   descripción, técnica, precio, categoría, y sus colores, tallas y stock. Cada
+   fila de color y talla es una combinación que se puede comprar; no se puede
+   repetir. Un producto no se borra, se oculta; una fila que ya tiene pedidos
+   tampoco se borra, se deja con stock 0.
+3. **Fotos de artículos:** elige un artículo; sube, ordena, haz principal o borra
    sus fotos. La primera es la que se ve en la tienda.
-3. **Fotos del sitio:** cambia o quita la foto de cada lugar de la página. Por
+4. **Fotos del sitio:** cambia o quita la foto de cada lugar de la página. Por
    ahora solo la **portada del inicio** se muestra en la tienda; el logo, el
    banner de mayoreo y el fondo ya se pueden preparar, pero todavía no se ven.
 
-Solo la administradora puede cambiar fotos: las reglas de seguridad de Supabase
-rechazan cualquier subida o cambio sin su sesión, aunque se llame directo a la
-base de datos.
+Solo la administradora puede cambiar productos, stock y fotos: las reglas de
+seguridad de Supabase rechazan cualquier cambio sin su sesión, aunque se llame
+directo a la base de datos.
 
 ## Diseño para PC y para celular
 
@@ -114,8 +121,8 @@ en los dos diseños.
    desde Cuenta → Regístrate.
 5. **Confirmación** → número de pedido, comprobante y estado. El stock baja.
 6. **Cuenta** (barra inferior) → pedidos de la clienta y cierre de sesión.
-7. **Panel de vendedora** (entra con la cuenta de administradora) → pedidos y
-   fotos.
+7. **Panel de vendedora** (entra con la cuenta de administradora) → pedidos,
+   productos e inventario, y fotos.
 8. **Link Del Video**
 https://youtu.be/eZb26JoHPJ4
 
@@ -158,7 +165,13 @@ test/            Pruebas de datos, lógica, componentes, ingreso, panel y recorr
   costo de envío ($9.000 en Cali, $12.000 en el resto) se guarda en el envío,
   pero no se suma al total. Está por confirmar.
 - **Pedidos y pagos:** falta guardarlos en Supabase; el pago con Wompi sigue
-  simulado.
+  simulado. Por eso el stock real todavía no baja cuando alguien compra: baja
+  solo en la sesión de la app. Cuando los pedidos sean reales, bajará en la base
+  de datos.
+- **Categorías:** hoy hay 4 y no se pueden crear nuevas desde el panel.
+- **Apple Pay y aviso por WhatsApp:** pendientes. Apple Pay necesita una pasarela
+  distinta de Wompi (se está evaluando Kushki, que lo tiene en beta para
+  Colombia).
 - **Publicación:** la app todavía no está publicada en internet.
 - **Diseño:** pendiente darle un aspecto más artesanal, hecho a mano, con las
   fotos reales de las piezas.
