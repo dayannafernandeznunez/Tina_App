@@ -96,6 +96,18 @@ abstract class AdministradoraRepositorio {
 
   /// Quita la foto de un lugar del sitio: vuelve el diseño por defecto.
   Future<AjusteSitio> quitarFotoSitio(AjusteSitio ajuste);
+
+  /// Crea el producto (si su `idProducto` es 0) o lo actualiza. Devuelve el
+  /// producto guardado, con su id.
+  Future<Producto> guardarProducto(Producto producto);
+
+  /// Crea la variante (si su `idVariante` es 0) o la actualiza; aquí se cambia
+  /// el stock. Devuelve la variante guardada, con su id.
+  Future<VarianteProducto> guardarVariante(VarianteProducto variante);
+
+  /// Borra una variante. Si ya tiene pedidos no se puede: lanza
+  /// [ErrorAdministradora] y conviene dejarla con stock 0.
+  Future<void> borrarVariante(int idVariante);
 }
 
 /// Hace todo lo anterior con Supabase (Auth, base de datos y Storage). Las
@@ -215,5 +227,78 @@ class AdministradoraSupabase implements AdministradoraRepositorio {
         .eq('clave', ajuste.clave);
     await _quitarArchivo(_carpetaSitio, ajuste.ruta);
     return AjusteSitio(clave: ajuste.clave, descripcion: ajuste.descripcion);
+  }
+
+  @override
+  Future<Producto> guardarProducto(Producto producto) async {
+    final datos = {
+      'id_categoria': producto.idCategoria,
+      'nombre': producto.nombre,
+      'descripcion': producto.descripcion,
+      'tecnica': producto.tecnica,
+      'precio': producto.precio,
+      'activo': producto.activo,
+    };
+    try {
+      final fila = producto.idProducto == 0
+          ? await _c.from('producto').insert(datos).select().single()
+          : await _c
+                .from('producto')
+                .update(datos)
+                .eq('id_producto', producto.idProducto)
+                .select()
+                .single();
+      return Producto.desdeMapa(fila);
+    } on PostgrestException catch (e) {
+      throw _traducir(e, 'No se pudo guardar el producto.');
+    }
+  }
+
+  @override
+  Future<VarianteProducto> guardarVariante(VarianteProducto variante) async {
+    final datos = {
+      'id_producto': variante.idProducto,
+      'color': variante.color,
+      'talla': variante.talla,
+      'stock': variante.stock,
+    };
+    try {
+      final fila = variante.idVariante == 0
+          ? await _c.from('variante_producto').insert(datos).select().single()
+          : await _c
+                .from('variante_producto')
+                .update(datos)
+                .eq('id_variante', variante.idVariante)
+                .select()
+                .single();
+      return VarianteProducto.desdeMapa(fila);
+    } on PostgrestException catch (e) {
+      throw _traducir(e, 'No se pudo guardar el stock.');
+    }
+  }
+
+  @override
+  Future<void> borrarVariante(int idVariante) async {
+    try {
+      await _c.from('variante_producto').delete().eq('id_variante', idVariante);
+    } on PostgrestException catch (e) {
+      throw _traducir(e, 'No se pudo borrar esa fila.');
+    }
+  }
+
+  /// Pasa los errores de la base de datos a un mensaje para la administradora.
+  ErrorAdministradora _traducir(PostgrestException e, String generico) {
+    if (e.code == '23505') {
+      return const ErrorAdministradora(
+        'Ya hay una fila con ese color y esa talla.',
+      );
+    }
+    if (e.code == '23503') {
+      return const ErrorAdministradora(
+        'Esa fila ya tiene pedidos o está en un carrito, así que no se puede '
+        'borrar. Déjala con stock 0.',
+      );
+    }
+    return ErrorAdministradora(generico);
   }
 }

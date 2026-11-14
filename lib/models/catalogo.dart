@@ -48,6 +48,16 @@ class Producto {
   final String tecnica;
   final int precio;
   final bool activo;
+
+  Producto copyWith({bool? activo}) => Producto(
+    idProducto: idProducto,
+    idCategoria: idCategoria,
+    nombre: nombre,
+    descripcion: descripcion,
+    tecnica: tecnica,
+    precio: precio,
+    activo: activo ?? this.activo,
+  );
 }
 
 /// Tabla IMAGEN_PRODUCTO. `orden` 1 es la foto principal. `ruta` es el archivo

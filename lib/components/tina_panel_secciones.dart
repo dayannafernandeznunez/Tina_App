@@ -5,6 +5,7 @@ import 'tina_chip.dart';
 /// Las partes del panel de la vendedora.
 enum SeccionPanel {
   pedidos('Pedidos'),
+  productos('Productos'),
   fotosArticulos('Fotos de artículos'),
   fotosSitio('Fotos del sitio');
 

@@ -23,6 +23,7 @@ export 'tina_logo.dart';
 export 'tina_nav_inferior.dart';
 export 'tina_opcion_compra.dart';
 export 'tina_panel_secciones.dart';
+export 'tina_producto_admin.dart';
 export 'tina_scaffold.dart';
 export 'tina_selector_cantidad.dart';
 export 'tina_selector_color.dart';

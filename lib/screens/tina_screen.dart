@@ -6,11 +6,13 @@ import '../data/catalogo.dart';
 import '../data/sesion.dart';
 import '../data/datos_simulados.dart';
 import '../logic/calculos.dart';
+import '../logic/borrador_producto.dart';
 import '../logic/validaciones.dart';
 import '../logic/vistas.dart';
 import '../models/models.dart';
 import '../pages/carrito_page.dart';
 import '../pages/checkout_page.dart';
+import '../pages/editar_producto_page.dart';
 import '../pages/confirmacion_page.dart';
 import '../pages/cuenta_page.dart';
 import '../pages/detalle_page.dart';
@@ -20,6 +22,7 @@ import '../pages/login_page.dart';
 import '../pages/panel_page.dart';
 import '../pages/panel_fotos_articulos_page.dart';
 import '../pages/panel_fotos_sitio_page.dart';
+import '../pages/panel_productos_page.dart';
 import '../pages/pedido_page.dart';
 import '../theme/tina_tema.dart';
 import '../utils/adaptable.dart';
@@ -36,6 +39,7 @@ enum Ruta {
   login,
   cuenta,
   panel,
+  productoEditar,
   pedido,
 }
 
@@ -94,6 +98,9 @@ class _TinaScreenState extends State<TinaScreen> {
   int? _idProductoFotos;
   bool _fotosOcupado = false;
   String? _claveSitioOcupada;
+  BorradorProducto? _borrador;
+  bool _mostrarErroresProducto = false;
+  int _contadorVariantes = 0;
 
   List<VarianteProducto> _variantes = [...DatosSimulados.variantes];
   List<Cliente> _clientes = [...DatosSimulados.clientes];
@@ -366,6 +373,192 @@ class _TinaScreenState extends State<TinaScreen> {
     _completarEntrada(cliente);
   }
 
+  // ------------------------------------------------- productos e inventario
+  String _claveNueva() => 'n${_contadorVariantes++}';
+
+  List<ProductoVista> _vistasAdmin() => [for (final p in _productos) _vista(p)];
+
+  void _nuevoProducto() {
+    if (_categorias.isEmpty) {
+      _aviso('Primero hace falta una categoría.');
+      return;
+    }
+    setState(() {
+      _borrador = BorradorProducto.nuevo(
+        idCategoria: _categorias.first.idCategoria,
+        claveVariante: _claveNueva(),
+      );
+      _mostrarErroresProducto = false;
+    });
+    _empujar(Ruta.productoEditar);
+  }
+
+  void _editarProducto(int idProducto) {
+    final producto = _productos.firstWhere((p) => p.idProducto == idProducto);
+    setState(() {
+      _borrador = BorradorProducto.desde(producto, [
+        for (final v in _variantes)
+          if (v.idProducto == idProducto) v,
+      ]);
+      _mostrarErroresProducto = false;
+    });
+    _empujar(Ruta.productoEditar);
+  }
+
+  void _cambiarBorrador(BorradorProducto Function(BorradorProducto) cambio) {
+    final actual = _borrador;
+    if (actual == null) return;
+    setState(() => _borrador = cambio(actual));
+  }
+
+  void _campoProducto(String campo, String valor) => _cambiarBorrador(
+    (b) => switch (campo) {
+      'nombre' => b.copyWith(nombre: valor),
+      'descripcion' => b.copyWith(descripcion: valor),
+      'tecnica' => b.copyWith(tecnica: valor),
+      'precio' => b.copyWith(precio: valor),
+      _ => b,
+    },
+  );
+
+  void _campoVariante(String clave, String campo, String valor) =>
+      _cambiarBorrador(
+        (b) => b.conVariante(
+          clave,
+          (v) => campo == 'color'
+              ? v.copyWith(color: valor)
+              : v.copyWith(talla: valor),
+        ),
+      );
+
+  void _quitarVariante(String clave) => _cambiarBorrador(
+    (b) => b.copyWith(
+      variantes: [
+        for (final v in b.variantes)
+          if (v.clave != clave) v,
+      ],
+    ),
+  );
+
+  void _agregarVariante() => _cambiarBorrador(
+    (b) => b.copyWith(
+      variantes: [
+        ...b.variantes,
+        BorradorVariante(clave: _claveNueva()),
+      ],
+    ),
+  );
+
+  void _cerrarEditorProducto() {
+    setState(() {
+      _borrador = null;
+      _mostrarErroresProducto = false;
+      if (_pila.length > 1) _pila = _pila.sublist(0, _pila.length - 1);
+    });
+  }
+
+  Future<void> _guardarProducto() async {
+    final borrador = _borrador;
+    if (borrador == null) return;
+    if (borrador.errores().isNotEmpty) {
+      setState(() => _mostrarErroresProducto = true);
+      return;
+    }
+    if (!_hayAdmin()) return;
+
+    int? idCreado;
+    final idsGuardados = <String, int>{};
+    await _accionFotos(() async {
+      final admin = widget.admin!;
+      try {
+        final producto = await admin.guardarProducto(borrador.aProducto());
+        idCreado = producto.idProducto;
+        final variantes = <VarianteProducto>[];
+        for (final v in borrador.variantes) {
+          final guardada = await admin.guardarVariante(
+            v.aVariante(producto.idProducto),
+          );
+          idsGuardados[v.clave] = guardada.idVariante;
+          variantes.add(guardada);
+        }
+        for (final id in borrador.idsVariantesOriginales) {
+          if (!borrador.variantes.any((v) => v.idVariante == id)) {
+            await admin.borrarVariante(id);
+          }
+        }
+        if (!mounted) return;
+        setState(() {
+          _productos = [
+            for (final p in _productos)
+              if (p.idProducto != producto.idProducto) p,
+            producto,
+          ]..sort((a, b) => a.idProducto.compareTo(b.idProducto));
+          _variantes = [
+            for (final v in _variantes)
+              if (v.idProducto != producto.idProducto) v,
+            ...variantes,
+          ];
+          _borrador = null;
+          if (_pila.length > 1) _pila = _pila.sublist(0, _pila.length - 1);
+        });
+      } catch (_) {
+        // Lo que alcanzó a guardarse queda en el formulario con su id, así al
+        // reintentar no se duplica, y el catálogo se vuelve a leer.
+        if (mounted) {
+          setState(() {
+            _borrador = _borrador?.conIds(
+              idProducto: idCreado,
+              idsVariantes: idsGuardados,
+            );
+          });
+          _cargarCatalogo();
+        }
+        rethrow;
+      }
+    }, exito: borrador.esNuevo ? 'Producto creado.' : 'Cambios guardados.');
+  }
+
+  Future<void> _alternarVisible(int idProducto) async {
+    if (!_hayAdmin()) return;
+    final actual = _productos.firstWhere((p) => p.idProducto == idProducto);
+    final nuevo = actual.copyWith(activo: !actual.activo);
+    await _accionFotos(
+      () async {
+        final guardado = await widget.admin!.guardarProducto(nuevo);
+        setState(() {
+          _productos = [
+            for (final p in _productos)
+              p.idProducto == idProducto ? guardado : p,
+          ];
+        });
+      },
+      exito: nuevo.activo ? 'Ahora se ve en la tienda.' : 'Ahora está oculto.',
+    );
+  }
+
+  Widget _editorProducto() {
+    final borrador = _borrador!;
+    return EditarProductoPage(
+      key: ValueKey('editar-${borrador.idProducto}'),
+      borrador: borrador,
+      categorias: _categorias,
+      errores: borrador.errores(),
+      mostrarErrores: _mostrarErroresProducto,
+      ocupado: _fotosOcupado,
+      onCampo: _campoProducto,
+      onCategoria: (id) => _cambiarBorrador((b) => b.copyWith(idCategoria: id)),
+      onVisible: (v) => _cambiarBorrador((b) => b.copyWith(activo: v)),
+      onVarianteCampo: _campoVariante,
+      onVarianteStock: (clave, n) => _cambiarBorrador(
+        (b) => b.conVariante(clave, (v) => v.copyWith(stock: n)),
+      ),
+      onQuitarVariante: _quitarVariante,
+      onAgregarVariante: _agregarVariante,
+      onGuardar: _guardarProducto,
+      onCancelar: _cerrarEditorProducto,
+    );
+  }
+
   /// Corre un cambio de fotos mostrando "un momento" y avisando el resultado.
   /// Una sola acción a la vez.
   Future<void> _accionFotos(
@@ -398,7 +591,7 @@ class _TinaScreenState extends State<TinaScreen> {
 
   bool _hayAdmin() {
     if (widget.admin != null) return true;
-    _aviso('Para cambiar fotos hace falta la conexión con la tienda.');
+    _aviso('Para guardar cambios hace falta la conexión con la tienda.');
     return false;
   }
 
@@ -1216,6 +1409,8 @@ class _TinaScreenState extends State<TinaScreen> {
         onNav: _onNav,
       ),
       Ruta.panel => _puedeVerPanel ? _panel() : _login(),
+      Ruta.productoEditar =>
+        _puedeVerPanel && _borrador != null ? _editorProducto() : _panel(),
       Ruta.pedido => PedidoPage(
         pedido: _pedidosCompletos.firstWhere(
           (p) => p.pedido.idPedido == _idPedidoVer,
@@ -1292,6 +1487,17 @@ class _TinaScreenState extends State<TinaScreen> {
           onPedido: _verPedido,
           onVerTienda: _irInicio,
           onSeccion: (s) => setState(() => _seccionPanel = s),
+          onSalir: widget.sesiones == null ? null : _cerrarSesion,
+        );
+      case SeccionPanel.productos:
+        return PanelProductosPage(
+          productos: _vistasAdmin(),
+          ocupado: _fotosOcupado,
+          onSeccion: (s) => setState(() => _seccionPanel = s),
+          onNuevo: _nuevoProducto,
+          onEditar: _editarProducto,
+          onAlternar: _alternarVisible,
+          onVerTienda: _irInicio,
           onSalir: widget.sesiones == null ? null : _cerrarSesion,
         );
       case SeccionPanel.fotosArticulos:

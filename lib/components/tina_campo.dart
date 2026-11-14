@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../theme/tina_tema.dart';
 
-enum TipoCampo { texto, correo, telefono, contrasena }
+enum TipoCampo { texto, correo, telefono, contrasena, numero }
 
 /// Campo de texto con etiqueta. Avisa cada cambio con [onChanged]; quien lo
 /// usa decide dónde guardar el valor. Si quien lo usa cambia [valor] (por
@@ -17,6 +17,7 @@ class TinaCampo extends StatefulWidget {
     this.valor = '',
     this.onChanged,
     this.textoError,
+    this.lineas = 1,
   });
 
   final String etiqueta;
@@ -25,6 +26,9 @@ class TinaCampo extends StatefulWidget {
   final String valor;
   final ValueChanged<String>? onChanged;
   final String? textoError;
+
+  /// Alto del campo en líneas de texto; con más de una sirve para descripciones.
+  final int lineas;
 
   @override
   State<TinaCampo> createState() => _TinaCampoState();
@@ -64,7 +68,8 @@ class _TinaCampoState extends State<TinaCampo> {
   TextInputType get _teclado => switch (widget.tipo) {
     TipoCampo.correo => TextInputType.emailAddress,
     TipoCampo.telefono => TextInputType.phone,
-    _ => TextInputType.text,
+    TipoCampo.numero => TextInputType.number,
+    _ => widget.lineas > 1 ? TextInputType.multiline : TextInputType.text,
   };
 
   @override
@@ -85,6 +90,8 @@ class _TinaCampoState extends State<TinaCampo> {
             controller: _controlador,
             onChanged: widget.onChanged,
             obscureText: widget.tipo == TipoCampo.contrasena,
+            minLines: widget.lineas,
+            maxLines: widget.lineas,
             keyboardType: _teclado,
             style: TinaTipografia.estilo(tamano: 16),
             cursorColor: TinaColores.naranja,

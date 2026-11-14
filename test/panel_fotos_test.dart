@@ -63,6 +63,17 @@ class _AdminFalsa implements AdministradoraRepositorio {
     llamadas.add('quitar:${ajuste.clave}');
     return AjusteSitio(clave: ajuste.clave, descripcion: ajuste.descripcion);
   }
+
+  // Esta parte (productos y stock) se prueba en panel_productos_test.dart.
+  @override
+  Future<Producto> guardarProducto(Producto producto) async => producto;
+
+  @override
+  Future<VarianteProducto> guardarVariante(VarianteProducto variante) async =>
+      variante;
+
+  @override
+  Future<void> borrarVariante(int idVariante) async {}
 }
 
 /// El inicio de sesión de mentira, con una administradora y una clienta.
