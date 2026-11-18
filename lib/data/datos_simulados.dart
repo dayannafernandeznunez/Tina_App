@@ -440,7 +440,7 @@ class _PedidosSemilla {
       ciudad: 'Medellín',
       departamento: 'Antioquia',
       direccion: 'Carrera 43A #1-50, Poblado',
-      costoEnvio: 18000,
+      costoEnvio: 5000,
       guia: 'GUIA-4810021',
     ),
     _SemillaPedido(
@@ -452,7 +452,7 @@ class _PedidosSemilla {
       ciudad: 'Cali',
       departamento: 'Valle del Cauca',
       direccion: 'Calle 5 #38-20, San Fernando',
-      costoEnvio: 9000,
+      costoEnvio: 5000,
     ),
     _SemillaPedido(
       id: 10,
@@ -463,7 +463,7 @@ class _PedidosSemilla {
       ciudad: 'Bogotá',
       departamento: 'Cundinamarca',
       direccion: 'Carrera 15 #85-10, Chicó',
-      costoEnvio: 12000,
+      costoEnvio: 5000,
     ),
     _SemillaPedido(
       id: 11,
@@ -475,7 +475,7 @@ class _PedidosSemilla {
       ciudad: 'Cali',
       departamento: 'Valle del Cauca',
       direccion: 'Avenida 6N #25-40, Granada',
-      costoEnvio: 9000,
+      costoEnvio: 5000,
     ),
     _SemillaPedido(
       id: 12,
@@ -486,7 +486,7 @@ class _PedidosSemilla {
       ciudad: 'Medellín',
       departamento: 'Antioquia',
       direccion: 'Carrera 43A #1-50, Poblado',
-      costoEnvio: 12000,
+      costoEnvio: 5000,
       guia: 'GUIA-4821937',
     ),
     _SemillaPedido(
@@ -498,7 +498,7 @@ class _PedidosSemilla {
       ciudad: 'Barranquilla',
       departamento: 'Atlántico',
       direccion: 'Calle 84 #50-12, Alto Prado',
-      costoEnvio: 12000,
+      costoEnvio: 5000,
       guia: 'GUIA-4822110',
     ),
     _SemillaPedido(
@@ -510,7 +510,7 @@ class _PedidosSemilla {
       ciudad: 'Cali',
       departamento: 'Valle del Cauca',
       direccion: 'Carrera 100 #14-20, Ciudad Jardín',
-      costoEnvio: 9000,
+      costoEnvio: 5000,
     ),
   ];
 
@@ -582,7 +582,8 @@ class _PedidosSemilla {
           ? 0
           : promociones[s.idPromocion]!.porcentaje;
       final descuento = (subtotal * porcentaje / 100).round();
-      final total = subtotal - descuento;
+      // Lo que paga la clienta: productos, menos descuento, más el envío.
+      final total = subtotal - descuento + s.costoEnvio;
 
       pedidos.add(
         Pedido(
@@ -622,7 +623,7 @@ class _PedidosSemilla {
         Pago(
           idPago: s.id,
           idPedido: s.id,
-          referenciaWompi: 'WMP-${48213 + s.id}-$numero',
+          referencia: 'WMP-${48213 + s.id}-$numero',
           monto: total,
           estado: estadoPago,
           fecha: s.fecha.add(const Duration(minutes: 5)),

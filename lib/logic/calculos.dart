@@ -24,6 +24,7 @@ class ResumenCarrito {
     required this.porcentaje,
     required this.descuento,
     this.promocion,
+    this.costoEnvio = 0,
   });
 
   final List<LineaCarrito> lineas;
@@ -33,7 +34,14 @@ class ResumenCarrito {
   final int descuento;
   final Promocion? promocion;
 
+  /// Lo que cuesta el envío de este pedido (0 en la contraentrega).
+  final int costoEnvio;
+
+  /// Total de los productos, con el descuento aplicado y sin el envío.
   int get total => subtotal - descuento;
+
+  /// Lo que paga la clienta: productos, descuento y envío.
+  int get totalConEnvio => total + costoEnvio;
   bool get vacio => lineas.isEmpty;
 }
 
@@ -49,6 +57,7 @@ class Calculos {
     required List<Producto> productos,
     required List<Promocion> promociones,
     required bool primeraCompra,
+    int costoEnvio = 0,
   }) {
     final variantePorId = {for (final v in variantes) v.idVariante: v};
     final productoPorId = {for (final p in productos) p.idProducto: p};
@@ -85,6 +94,7 @@ class Calculos {
       porcentaje: porcentaje,
       descuento: (subtotal * porcentaje / 100).round(),
       promocion: elegida,
+      costoEnvio: costoEnvio,
     );
   }
 
@@ -99,10 +109,27 @@ class Calculos {
     );
   }
 
-  /// Costo de envío de prueba: $9.000 en Cali y $12.000 al resto del país.
-  /// La regla real está pendiente (PA-2).
-  static int costoEnvio(String ciudad) =>
-      ciudad.trim().toLowerCase() == 'cali' ? 9000 : 12000;
+  /// Costo de envío: $5.000 fijos para todo el país. La administradora asume
+  /// el resto. La contraentrega (solo en Cali) no cobra envío.
+  static const int costoEnvioFijo = 5000;
+
+  static int costoEnvio(MetodoPago metodo) =>
+      metodo == MetodoPago.contraentrega ? 0 : costoEnvioFijo;
+
+  static String _sinTildes(String texto) => texto
+      .trim()
+      .toLowerCase()
+      .replaceAll('á', 'a')
+      .replaceAll('é', 'e')
+      .replaceAll('í', 'i')
+      .replaceAll('ó', 'o')
+      .replaceAll('ú', 'u')
+      .replaceAll('ü', 'u');
+
+  /// La contraentrega solo existe en Cali, Valle del Cauca.
+  static bool esCali(String ciudad, String departamento) =>
+      _sinTildes(ciudad) == 'cali' &&
+      const {'valle del cauca', 'valle'}.contains(_sinTildes(departamento));
 
   /// Texto que explica cuánto falta para el descuento por volumen.
   static String notaDescuento({

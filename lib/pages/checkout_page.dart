@@ -20,6 +20,10 @@ class CheckoutPage extends StatelessWidget {
     required this.haySesion,
     required this.valores,
     required this.mostrarErrores,
+    required this.metodo,
+    required this.puedeContraentrega,
+    this.ocupado = false,
+    required this.onMetodo,
     required this.onModo,
     required this.onCampo,
     required this.onPagar,
@@ -35,6 +39,16 @@ class CheckoutPage extends StatelessWidget {
   final bool haySesion;
   final Map<String, String> valores;
   final bool mostrarErrores;
+
+  /// Cómo paga: en línea (Wompi) o contraentrega.
+  final MetodoPago metodo;
+
+  /// Si el envío es a Cali, Valle del Cauca, y por eso hay contraentrega.
+  final bool puedeContraentrega;
+
+  /// Se está creando el pedido: el botón no se puede volver a tocar.
+  final bool ocupado;
+  final ValueChanged<MetodoPago> onMetodo;
   final ValueChanged<ModoCompra> onModo;
   final void Function(String clave, String valor) onCampo;
   final VoidCallback onPagar;
@@ -85,8 +99,13 @@ class CheckoutPage extends StatelessWidget {
       onLogo: onLogo,
       onNav: onNav,
       accion: TinaBoton(
-        etiqueta: 'Pagar con Wompi · ${formatoPesos(resumen.total)}',
-        onPressed: onPagar,
+        key: const ValueKey('boton-pagar'),
+        etiqueta: ocupado
+            ? 'Un momento…'
+            : metodo == MetodoPago.contraentrega
+            ? 'Confirmar pedido · ${formatoPesos(resumen.totalConEnvio)}'
+            : 'Pagar con Wompi · ${formatoPesos(resumen.totalConEnvio)}',
+        onPressed: ocupado ? () {} : onPagar,
       ),
       cuerpo: TinaLista(
         children: [
@@ -160,6 +179,39 @@ class CheckoutPage extends StatelessWidget {
                     ),
                   ],
                 ),
+                const SizedBox(height: 26),
+                _titulo('¿Cómo pagas?'),
+                const SizedBox(height: 12),
+                TinaOpcionCompra(
+                  key: const ValueKey('opcion-wompi'),
+                  titulo: 'Pagar en línea',
+                  subtitulo:
+                      'Con tarjeta, PSE o Nequi, en la página segura de Wompi.',
+                  seleccionada: metodo == MetodoPago.wompi,
+                  onTap: () => onMetodo(MetodoPago.wompi),
+                ),
+                if (puedeContraentrega) ...[
+                  const SizedBox(height: 12),
+                  TinaOpcionCompra(
+                    key: const ValueKey('opcion-contraentrega'),
+                    titulo: 'Contraentrega en Cali',
+                    subtitulo:
+                        'Te escribimos por WhatsApp para coordinar la entrega. '
+                        'Pagas por transferencia y no se cobra envío.',
+                    seleccionada: metodo == MetodoPago.contraentrega,
+                    onTap: () => onMetodo(MetodoPago.contraentrega),
+                  ),
+                ] else ...[
+                  const SizedBox(height: 10),
+                  Text(
+                    'La contraentrega está disponible solo en Cali, Valle del Cauca.',
+                    key: const ValueKey('nota-contraentrega'),
+                    style: TinaTipografia.estilo(
+                      tamano: 12,
+                      color: TinaColores.marron,
+                    ),
+                  ),
+                ],
               ],
             ),
             derecha: Column(
@@ -187,13 +239,22 @@ class CheckoutPage extends StatelessWidget {
                     tipo: TipoFila.descuento,
                   ),
                 TinaFilaResumen(
+                  key: const ValueKey('fila-envio'),
+                  etiqueta: 'Envío',
+                  valor: resumen.costoEnvio == 0
+                      ? 'Gratis'
+                      : formatoPesos(resumen.costoEnvio),
+                ),
+                TinaFilaResumen(
                   etiqueta: 'Total',
-                  valor: formatoPesos(resumen.total),
+                  valor: formatoPesos(resumen.totalConEnvio),
                   tipo: TipoFila.total,
                 ),
                 const SizedBox(height: 14),
                 Text(
-                  'Al pagar, te llevamos a Wompi para completar el pago de forma segura.',
+                  metodo == MetodoPago.contraentrega
+                      ? 'Al confirmar, te escribimos por WhatsApp para coordinar la entrega y el pago por transferencia.'
+                      : 'Al pagar, te llevamos a Wompi para completar el pago de forma segura.',
                   style: TinaTipografia.estilo(
                     tamano: 13,
                     color: TinaColores.marron,

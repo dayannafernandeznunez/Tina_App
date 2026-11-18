@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'config/supabase_config.dart';
 import 'data/administradora.dart';
 import 'data/catalogo.dart';
+import 'data/pedidos.dart';
 import 'data/sesion.dart';
 import 'screens/tina_screen.dart';
 import 'theme/tina_tema.dart';
@@ -18,7 +19,11 @@ Future<void> main() async {
     TinaApp(
       catalogo: CatalogoSupabase(),
       sesiones: SesionSupabase(),
+      pedidos: PedidosSupabase(),
       admin: AdministradoraSupabase(),
+      // El pago en línea con Wompi todavía no está conectado (por eso
+      // `pagoEnLinea` queda apagado): por ahora solo se puede comprar con
+      // contraentrega, en Cali.
     ),
   );
 }
@@ -33,7 +38,9 @@ class TinaApp extends StatelessWidget {
     super.key,
     this.catalogo,
     this.sesiones,
+    this.pedidos,
     this.admin,
+    this.pagoEnLinea = false,
     this.selectorFotos = const SelectorFotosDispositivo(),
   });
 
@@ -42,6 +49,12 @@ class TinaApp extends StatelessWidget {
   /// El inicio de sesión (clientas y administradora). Sin él, las cuentas son
   /// de ejemplo.
   final SesionRepositorio? sesiones;
+
+  /// Crear y leer pedidos. Sin él, los pedidos viven solo en la memoria.
+  final PedidosRepositorio? pedidos;
+
+  /// Si el pago en línea con Wompi está conectado.
+  final bool pagoEnLinea;
 
   /// Lo que solo puede hacer la administradora: cambiar fotos.
   final AdministradoraRepositorio? admin;
@@ -57,6 +70,8 @@ class TinaApp extends StatelessWidget {
       home: TinaScreen(
         catalogo: catalogo,
         sesiones: sesiones,
+        pedidos: pedidos,
+        pagoEnLinea: pagoEnLinea,
         admin: admin,
         selectorFotos: selectorFotos,
       ),

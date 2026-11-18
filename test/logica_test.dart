@@ -99,12 +99,58 @@ void main() {
     });
   });
 
-  group('Envío', () {
-    test('Cali cuesta menos que el resto del país', () {
-      expect(Calculos.costoEnvio('Cali'), 9000);
-      expect(Calculos.costoEnvio(' cali '), 9000);
-      expect(Calculos.costoEnvio('Bogotá'), 12000);
+  group('Envío y contraentrega', () {
+    test('el envío es de \$5.000 para todo el país', () {
+      expect(Calculos.costoEnvioFijo, 5000);
+      expect(Calculos.costoEnvio(MetodoPago.wompi), 5000);
+      expect(Calculos.costoEnvio(MetodoPago.applePay), 5000);
     });
+
+    test('la contraentrega no cobra envío', () {
+      expect(Calculos.costoEnvio(MetodoPago.contraentrega), 0);
+    });
+
+    test('la contraentrega es solo para Cali, Valle del Cauca', () {
+      expect(Calculos.esCali('Cali', 'Valle del Cauca'), isTrue);
+      expect(Calculos.esCali(' CALÍ ', 'valle del cauca'), isTrue);
+      expect(Calculos.esCali('Cali', 'Valle'), isTrue);
+      expect(Calculos.esCali('Palmira', 'Valle del Cauca'), isFalse);
+      expect(Calculos.esCali('Cali', 'Antioquia'), isFalse);
+      expect(Calculos.esCali('', ''), isFalse);
+    });
+
+    test('el total que paga la clienta suma el envío', () {
+      final resumen = Calculos.resumen(
+        items: const [
+          CarritoItem(idItem: 1, idCarrito: 1, idVariante: 1, cantidad: 2),
+        ],
+        variantes: DatosSimulados.variantes,
+        productos: DatosSimulados.productos,
+        promociones: DatosSimulados.promociones,
+        primeraCompra: false,
+        costoEnvio: 5000,
+      );
+
+      expect(resumen.subtotal, 110000);
+      expect(resumen.total, 110000);
+      expect(resumen.totalConEnvio, 115000);
+    });
+
+    test(
+      'en los datos de ejemplo cada pedido incluye su envío en el total',
+      () {
+        for (final p in DatosSimulados.pedidos) {
+          final envio = DatosSimulados.envios.firstWhere(
+            (e) => e.idPedido == p.idPedido,
+          );
+          expect(
+            p.total,
+            p.subtotal - p.descuento + envio.costo,
+            reason: p.codigo,
+          );
+        }
+      },
+    );
   });
 
   group('Vistas', () {

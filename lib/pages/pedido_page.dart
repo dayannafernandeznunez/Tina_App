@@ -37,7 +37,16 @@ class PedidoPage extends StatelessWidget {
       cuerpo: TinaLista(
         anchoMaximo: 760,
         children: [
-          TinaEstadoPedido(estado: p.estadoActual, modo: ModoEstado.mensaje),
+          TinaEstadoPedido(
+            estado: p.estadoActual,
+            modo: ModoEstado.mensaje,
+            mensaje:
+                p.metodoPago == MetodoPago.contraentrega &&
+                    p.estadoActual == EstadoPedido.pendiente
+                ? 'Te escribiremos por WhatsApp para coordinar la entrega. '
+                      'El pago es por transferencia.'
+                : null,
+          ),
           _titulo('Pedido'),
           TinaFilaResumen(etiqueta: 'Fecha', valor: formatoFecha(p.fecha)),
           TinaFilaResumen(etiqueta: 'Clienta', valor: pedido.cliente.nombre),
@@ -59,14 +68,22 @@ class PedidoPage extends StatelessWidget {
               tipo: TipoFila.descuento,
             ),
           TinaFilaResumen(
+            etiqueta: 'Envío',
+            valor: envio.costo == 0 ? 'Gratis' : formatoPesos(envio.costo),
+          ),
+          TinaFilaResumen(
             etiqueta: 'Total',
             valor: formatoPesos(p.total),
             tipo: TipoFila.total,
           ),
           _titulo('Pago'),
           TinaFilaResumen(
-            etiqueta: 'Referencia Wompi',
-            valor: pedido.pago?.referenciaWompi ?? '—',
+            etiqueta: 'Método de pago',
+            valor: p.metodoPago.etiqueta,
+          ),
+          TinaFilaResumen(
+            etiqueta: 'Referencia',
+            valor: pedido.pago?.referencia ?? '—',
           ),
           TinaFilaResumen(
             etiqueta: 'Estado del pago',

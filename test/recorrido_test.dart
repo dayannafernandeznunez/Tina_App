@@ -231,13 +231,114 @@ void main() {
       expect(find.text('confirmado!'), findsOneWidget);
       expect(find.text('TINA-0015'), findsOneWidget);
       expect(find.text('C-0015'), findsOneWidget);
-      expect(find.text(r'$110.000'), findsOneWidget);
+      // 2 × 55.000 + 5.000 de envío.
+      expect(find.text(r'$115.000'), findsOneWidget);
 
       // El stock del collar naranja bajó de 6 a 4.
       await _tocar(tester, find.text('Seguir comprando'));
       await _abrirProducto(tester, 1);
       expect(find.text('Quedan 4'), findsOneWidget);
     });
+
+    testWidgets('el envío cuesta \$5.000 y se suma al total', (tester) async {
+      await _abrirApp(tester);
+      await _abrirProducto(tester, 3); // aretes $18.000
+      await _agregarAlCarrito(tester);
+      await _tocar(tester, find.text('Continuar'));
+
+      expect(
+        find.descendant(
+          of: _llave('fila-envio'),
+          matching: find.text(r'$5.000'),
+        ),
+        findsOneWidget,
+      );
+      expect(find.text(r'$23.000'), findsWidgets); // 18.000 + 5.000
+      expect(find.textContaining('Pagar con Wompi · \$23.000'), findsOneWidget);
+    });
+
+    testWidgets('la contraentrega solo aparece si el envío es a Cali', (
+      tester,
+    ) async {
+      await _abrirApp(tester);
+      await _abrirProducto(tester, 3);
+      await _agregarAlCarrito(tester);
+      await _tocar(tester, find.text('Continuar'));
+
+      await _escribir(tester, 'ciudad', 'Bogotá');
+      await _escribir(tester, 'departamento', 'Cundinamarca');
+      expect(_llave('opcion-contraentrega'), findsNothing);
+      expect(_llave('nota-contraentrega'), findsOneWidget);
+
+      await _escribir(tester, 'ciudad', 'Cali');
+      await _escribir(tester, 'departamento', 'Valle del Cauca');
+      await tester.pumpAndSettle();
+      expect(_llave('opcion-contraentrega'), findsOneWidget);
+      expect(_llave('nota-contraentrega'), findsNothing);
+    });
+
+    testWidgets(
+      'contraentrega en Cali: sin envío, pendiente y sin comprobante',
+      (tester) async {
+        await _abrirApp(tester);
+        await _abrirProducto(tester, 3); // aretes $18.000
+        await _agregarAlCarrito(tester);
+        await _tocar(tester, find.text('Continuar'));
+        await _llenarEnvio(tester); // Cali, Valle del Cauca
+
+        await _tocar(tester, _llave('opcion-contraentrega'));
+        expect(
+          find.descendant(
+            of: _llave('fila-envio'),
+            matching: find.text('Gratis'),
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.textContaining('Confirmar pedido · \$18.000'),
+          findsOneWidget,
+        );
+        expect(find.textContaining('Pagar con Wompi'), findsNothing);
+
+        await _tocar(tester, find.textContaining('Confirmar pedido'));
+
+        expect(find.text('recibido!'), findsOneWidget);
+        expect(find.text('Transferencia'), findsOneWidget);
+        expect(find.text('Total a pagar'), findsOneWidget);
+        expect(
+          find.textContaining('Te escribiremos por WhatsApp'),
+          findsOneWidget,
+        );
+        expect(find.text('C-0015'), findsNothing);
+
+        // En el pedido queda pendiente y con su método de pago.
+        await _tocar(tester, find.text('Ver mi pedido'));
+        expect(find.text('Contraentrega'), findsOneWidget);
+        expect(find.text('Sin comprobante'), findsOneWidget);
+        expect(find.text('Gratis'), findsWidgets);
+      },
+    );
+
+    testWidgets(
+      'si cambia la ciudad, la contraentrega vuelve a pago en línea',
+      (tester) async {
+        await _abrirApp(tester);
+        await _abrirProducto(tester, 3);
+        await _agregarAlCarrito(tester);
+        await _tocar(tester, find.text('Continuar'));
+        await _llenarEnvio(tester);
+        await _tocar(tester, _llave('opcion-contraentrega'));
+        expect(find.textContaining('Confirmar pedido'), findsOneWidget);
+
+        await _escribir(tester, 'ciudad', 'Bogotá');
+        await tester.pumpAndSettle();
+
+        expect(
+          find.textContaining('Pagar con Wompi · \$23.000'),
+          findsOneWidget,
+        );
+      },
+    );
 
     testWidgets('con cuenta: inicia sesión desde el checkout y recibe el 20%', (
       tester,

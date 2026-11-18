@@ -12,8 +12,9 @@ comprobantes, envíos, historial).
 | Catálogo (categorías, productos, variantes con stock, promociones) | **Real**: se lee de Supabase y la administradora lo edita desde el panel |
 | Fotos de artículos y del sitio | **Reales**: las sube la administradora desde el panel y las ve todo el mundo |
 | Cuentas e ingreso (clientas y administradora) | **Reales**: Supabase Auth, un solo ingreso para todas |
-| Pedidos, pagos, comprobantes y envíos | **Simulados** en memoria: aún no se guardan en la nube |
-| Pago con Wompi | **Simulado**: siempre sale aprobado |
+| Pedidos (crear, ver, cambiar estado), stock, descuentos y envío | **Reales**: los crea y calcula Supabase |
+| Contraentrega en Cali | **Real**: pedido pendiente que se coordina por WhatsApp |
+| Pago en línea con Wompi | **Pendiente**: todavía no está conectado. Mientras tanto solo se puede comprar con contraentrega, en Cali |
 
 Sin conexión, o en las pruebas, la app usa **datos de ejemplo** coherentes con
 el modelo.
@@ -157,21 +158,34 @@ test/            Pruebas de datos, lógica, componentes, ingreso, panel y recorr
   a un `Navigator` con páginas. El botón "atrás" del sistema retrocede por esa
   pila. La barra inferior (Inicio, Categorías, Carrito, Cuenta) cambia de sección.
 
-## Decisiones y pendientes
+## Reglas de la compra
 
-- **Descuentos:** si aplican los dos a la vez, se toma el mayor y no se
-  acumulan. Está por confirmar.
-- **Total del pedido:** `total = subtotal − descuento`, como en el diseño. El
-  costo de envío ($9.000 en Cali, $12.000 en el resto) se guarda en el envío,
-  pero no se suma al total. Está por confirmar.
-- **Pedidos y pagos:** falta guardarlos en Supabase; el pago con Wompi sigue
-  simulado. Por eso el stock real todavía no baja cuando alguien compra: baja
-  solo en la sesión de la app. Cuando los pedidos sean reales, bajará en la base
-  de datos.
+- **Envío:** $5.000 fijos para todo el país; la vendedora asume el resto. Se
+  suma al total: `total = subtotal − descuento + envío`. El valor está en la
+  tabla `ajuste_tienda` de Supabase (`costo_envio`).
+- **Descuentos:** 20% en la primera compra con cuenta y 30% con 14 o más
+  unidades. No se acumulan: si aplican los dos, se toma el mayor.
+- **Contraentrega:** solo si el envío es a **Cali, Valle del Cauca**. La clienta
+  marca contraentrega y la vendedora la contacta por WhatsApp para coordinar. El
+  pago es **por transferencia** (el domiciliario entrega, pero no recibe dinero)
+  y **no se cobra envío**. El pedido queda pendiente; cuando llega la
+  transferencia, la administradora lo pasa a "Pagado" desde el panel y se crea el
+  comprobante.
+- **Stock:** se descuenta al crear el pedido. Si el pedido se cancela, el stock
+  vuelve. Los precios, descuentos y el stock los calcula la base de datos al
+  crear el pedido, no el navegador.
+
+## Pendientes
+
+- **Pago en línea con Wompi:** todavía no está conectado (`pagoEnLinea` queda
+  apagado). Mientras tanto, fuera de Cali la compra avisa que el pago en línea
+  estará disponible pronto. Falta crear el pago en Wompi, recibir su aviso de
+  pago aprobado y marcar el pedido como pagado.
+- **Apple Pay:** necesita una pasarela distinta de Wompi (se está evaluando
+  Kushki, que lo tiene en beta para Colombia, solo con Visa y Mastercard).
+- **Aviso por WhatsApp** a la vendedora cuando entra un pedido.
+- **Guía del pedido** para imprimir o descargar desde el panel.
 - **Categorías:** hoy hay 4 y no se pueden crear nuevas desde el panel.
-- **Apple Pay y aviso por WhatsApp:** pendientes. Apple Pay necesita una pasarela
-  distinta de Wompi (se está evaluando Kushki, que lo tiene en beta para
-  Colombia).
 - **Publicación:** la app todavía no está publicada en internet.
 - **Diseño:** pendiente darle un aspecto más artesanal, hecho a mano, con las
   fotos reales de las piezas.

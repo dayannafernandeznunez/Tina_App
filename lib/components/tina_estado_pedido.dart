@@ -62,10 +62,16 @@ class TinaEstadoPedido extends StatelessWidget {
     super.key,
     required this.estado,
     this.modo = ModoEstado.etiqueta,
+    this.mensaje,
   });
 
   final EstadoPedido estado;
   final ModoEstado modo;
+
+  /// Texto propio para el modo mensaje, en vez del de siempre del estado. Sirve
+  /// para casos como la contraentrega, donde "pendiente" no significa que se
+  /// espera un pago en línea.
+  final String? mensaje;
 
   @override
   Widget build(BuildContext context) {
@@ -136,7 +142,7 @@ class TinaEstadoPedido extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  paleta.mensaje,
+                  mensaje ?? paleta.mensaje,
                   style: TinaTipografia.estilo(tamano: 14, altura: 1.4),
                 ),
               ],

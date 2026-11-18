@@ -80,7 +80,14 @@ void main() {
 
         final subtotal = detalles.fold<int>(0, (s, d) => s + d.subtotal);
         expect(pedido.subtotal, subtotal, reason: pedido.codigo);
-        expect(pedido.total, pedido.subtotal - pedido.descuento);
+        final envio = DatosSimulados.envios.firstWhere(
+          (e) => e.idPedido == pedido.idPedido,
+        );
+        expect(
+          pedido.total,
+          pedido.subtotal - pedido.descuento + envio.costo,
+          reason: pedido.codigo,
+        );
 
         final porcentaje = pedido.idPromocion == null
             ? 0

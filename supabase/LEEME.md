@@ -10,6 +10,12 @@ de tu proyecto en Supabase.
 | 2 | `migrations/20261114000002_seguridad_y_fotos.sql` | Pone las reglas de seguridad y crea las carpetas de fotos `productos` y `sitio`. |
 | 3 | `seed.sql` | Carga las 4 categorías, los 8 productos con sus variantes, las 2 promociones y los 4 lugares de fotos del sitio. |
 | 4 | `crear_administradora.sql` | Convierte tu cuenta en administradora (antes cambia `TU_CORREO_AQUI`). |
+| 5 | `migrations/20261114000003_cuentas_de_clientas.sql` | Crea la fila de clienta sola al registrarse y deja que cada una vea la suya. |
+| 6 | `migrations/20261118000004_pedidos_reales.sql` | Pedidos reales: crea el pedido descontando el stock, con descuentos y el envío de $5.000; contraentrega en Cali; cambios de estado; cada clienta ve sus pedidos. |
+
+Los scripts nuevos se agregan al final: si ya ejecutaste los anteriores, solo
+ejecuta los que falten, en orden. La prueba de que funcionan está en
+[`pruebas/`](pruebas/LEEME.md).
 
 ## Paso a paso
 

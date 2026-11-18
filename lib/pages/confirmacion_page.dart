@@ -18,7 +18,12 @@ class ConfirmacionPage extends StatelessWidget {
     required this.onLogo,
     required this.onCarrito,
     required this.onNav,
+    this.contraentrega = false,
   });
+
+  /// El pedido es contraentrega: se coordina por WhatsApp y se paga por
+  /// transferencia, así que no hay pago en línea ni comprobante todavía.
+  final bool contraentrega;
 
   final String codigoPedido;
   final String numeroComprobante;
@@ -61,7 +66,7 @@ class ConfirmacionPage extends StatelessWidget {
                 const EstrellaTina(tamano: 52, color: TinaColores.naranja),
                 const SizedBox(height: 6),
                 Text(
-                  '¡Pedido',
+                  contraentrega ? '¡Pedido' : '¡Pedido',
                   style: TinaTipografia.estilo(
                     tamano: 40,
                     peso: FontWeight.w800,
@@ -70,7 +75,7 @@ class ConfirmacionPage extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  'confirmado!',
+                  contraentrega ? 'recibido!' : 'confirmado!',
                   style: TinaTipografia.serif(
                     tamano: 44,
                     color: TinaColores.rojo,
@@ -90,21 +95,37 @@ class ConfirmacionPage extends StatelessWidget {
           ),
           const SizedBox(height: 22),
           TinaFilaResumen(etiqueta: 'Número de pedido', valor: codigoPedido),
+          if (contraentrega)
+            const TinaFilaResumen(
+              etiqueta: 'Forma de pago',
+              detalle: 'Contraentrega en Cali',
+              valor: 'Transferencia',
+            )
+          else
+            TinaFilaResumen(
+              etiqueta: 'Número de comprobante',
+              detalle: 'Wompi · $referenciaPago',
+              valor: numeroComprobante,
+            ),
           TinaFilaResumen(
-            etiqueta: 'Número de comprobante',
-            detalle: 'Wompi · $referenciaPago',
-            valor: numeroComprobante,
-          ),
-          TinaFilaResumen(
-            etiqueta: 'Total pagado',
+            etiqueta: contraentrega ? 'Total a pagar' : 'Total pagado',
             valor: totalPagado,
             tipo: TipoFila.total,
           ),
           const SizedBox(height: 16),
-          const TinaEstadoPedido(
-            estado: EstadoPedido.pagado,
-            modo: ModoEstado.mensaje,
-          ),
+          if (contraentrega)
+            const TinaEstadoPedido(
+              estado: EstadoPedido.pendiente,
+              modo: ModoEstado.mensaje,
+              mensaje:
+                  'Te escribiremos por WhatsApp para coordinar la entrega. '
+                  'El pago es por transferencia y no se cobra envío.',
+            )
+          else
+            const TinaEstadoPedido(
+              estado: EstadoPedido.pagado,
+              modo: ModoEstado.mensaje,
+            ),
           const SizedBox(height: 14),
           Row(
             spacing: 10,

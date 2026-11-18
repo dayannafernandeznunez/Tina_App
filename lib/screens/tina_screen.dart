@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../components/components.dart';
 import '../data/administradora.dart';
 import '../data/catalogo.dart';
+import '../data/pedidos.dart';
 import '../data/sesion.dart';
 import '../data/datos_simulados.dart';
 import '../logic/calculos.dart';
@@ -54,7 +55,9 @@ class TinaScreen extends StatefulWidget {
     super.key,
     this.catalogo,
     this.sesiones,
+    this.pedidos,
     this.admin,
+    this.pagoEnLinea = false,
     this.selectorFotos = const SelectorFotosDispositivo(),
   });
 
@@ -66,6 +69,14 @@ class TinaScreen extends StatefulWidget {
   /// Si es `null`, la app funciona en modo de ejemplo: las cuentas son de
   /// mentira y el panel se abre sin cuenta.
   final SesionRepositorio? sesiones;
+
+  /// Crear pedidos y leerlos. Si es `null`, los pedidos viven solo en la
+  /// memoria de la app (modo de ejemplo).
+  final PedidosRepositorio? pedidos;
+
+  /// Si el pago en línea con Wompi está conectado. Mientras no lo esté, solo se
+  /// puede comprar con contraentrega (en Cali).
+  final bool pagoEnLinea;
 
   /// Lo que solo puede hacer la administradora: cambiar fotos. Si es `null`,
   /// no se puede cambiar ninguna foto.
@@ -87,7 +98,7 @@ class _TinaScreenState extends State<TinaScreen> {
   List<Promocion> _promociones = [...DatosSimulados.promociones];
   List<ImagenProducto> _imagenes = [];
   List<AjusteSitio> _ajustesSitio = [];
-  final List<Usuario> _usuarios = [...DatosSimulados.usuarios];
+  List<Usuario> _usuarios = [...DatosSimulados.usuarios];
 
   bool _cargandoCatalogo = false;
 
@@ -132,6 +143,8 @@ class _TinaScreenState extends State<TinaScreen> {
 
   final Map<String, String> _datosEnvio = {};
   bool _mostrarErrores = false;
+  MetodoPago _metodoPago = MetodoPago.wompi;
+  bool _comprando = false;
 
   bool _registro = false;
 
@@ -151,10 +164,26 @@ class _TinaScreenState extends State<TinaScreen> {
   // ------------------------------------------------------------ derivados
   int get _unidades => _items.fold(0, (s, i) => s + i.cantidad);
 
-  bool get _conCuenta => _modo == ModoCompra.cuenta && _sesion != null;
+  /// Con cuentas reales, quien tiene la sesión iniciada compra con su cuenta:
+  /// la base de datos identifica a la compradora por su sesión.
+  bool get _conCuenta =>
+      _sesion != null &&
+      (_modo == ModoCompra.cuenta || widget.sesiones != null);
 
   bool get _aplicaPrimeraCompra =>
       _conCuenta && Calculos.esPrimeraCompra(_sesion!.idCliente, _pedidos);
+
+  /// La contraentrega solo existe si el envío es a Cali, Valle del Cauca.
+  bool get _puedeContraentrega => Calculos.esCali(
+    _datosEnvio['ciudad'] ?? '',
+    _datosEnvio['departamento'] ?? '',
+  );
+
+  /// Si eligió contraentrega y luego cambió la ciudad, vuelve a pago en línea.
+  MetodoPago get _metodoEfectivo =>
+      _metodoPago == MetodoPago.contraentrega && !_puedeContraentrega
+      ? MetodoPago.wompi
+      : _metodoPago;
 
   ResumenCarrito get _resumen => Calculos.resumen(
     items: _items,
@@ -162,6 +191,7 @@ class _TinaScreenState extends State<TinaScreen> {
     productos: _productos,
     promociones: _promociones,
     primeraCompra: _aplicaPrimeraCompra,
+    costoEnvio: Calculos.costoEnvio(_metodoEfectivo),
   );
 
   List<String> get _nombresCategorias => [
@@ -287,6 +317,7 @@ class _TinaScreenState extends State<TinaScreen> {
         activa.cliente,
       ];
     });
+    _cargarPedidos();
   }
 
   /// Modo de ejemplo: el enlace de la página de ingreso abre el panel.
@@ -354,6 +385,7 @@ class _TinaScreenState extends State<TinaScreen> {
         cliente,
       ];
     });
+    _cargarPedidos(cliente: cliente, esAdministradora: activa.esAdministradora);
     if (activa.esAdministradora) {
       setState(() {
         _sesion = cliente;
@@ -911,8 +943,190 @@ class _TinaScreenState extends State<TinaScreen> {
     setState(() => _modo = modo);
   }
 
+  void _elegirMetodo(MetodoPago metodo) => setState(() => _metodoPago = metodo);
+
   void _escribirEnvio(String clave, String valor) {
     setState(() => _datosEnvio[clave] = valor);
+  }
+
+  // -------------------------------------------------------- pedidos reales
+  /// Lee de Supabase los pedidos que esta persona puede ver y reemplaza los de
+  /// la memoria. Sin sesión no hay nada que leer.
+  Future<void> _cargarPedidos({
+    Cliente? cliente,
+    bool? esAdministradora,
+  }) async {
+    final repo = widget.pedidos;
+    final quien = cliente ?? _sesion;
+    if (repo == null || quien == null) return;
+    try {
+      final datos = await repo.cargar(
+        esAdministradora: esAdministradora ?? _esAdmin,
+      );
+      if (!mounted) return;
+      setState(() {
+        _pedidos = [...datos.pedidos];
+        _detalles = [...datos.detalles];
+        _envios = [...datos.envios];
+        _pagos = [...datos.pagos];
+        _comprobantes = [...datos.comprobantes];
+        _historial = [...datos.historial];
+        _usuarios = [...datos.usuarios];
+        _clientes = [
+          for (final c in datos.clientes)
+            if (c.idCliente != quien.idCliente) c,
+          quien,
+        ];
+      });
+    } catch (error) {
+      debugPrint('No se pudieron leer los pedidos: $error');
+    }
+  }
+
+  /// Crea el pedido en la base de datos y muestra la confirmación.
+  Future<void> _pagarReal() async {
+    final repo = widget.pedidos!;
+    final metodo = _metodoEfectivo;
+    if (metodo != MetodoPago.contraentrega && !widget.pagoEnLinea) {
+      _aviso(
+        'El pago en línea estará disponible muy pronto. '
+        'Si estás en Cali, puedes elegir contraentrega.',
+      );
+      return;
+    }
+    if (_comprando) return;
+    setState(() => _comprando = true);
+
+    final resumen = _resumen;
+    final nombre = _datosEnvio['nombre']!.trim();
+    final correo = _datosEnvio['correo']!.trim();
+    final telefono = _datosEnvio['telefono']!.trim();
+    final envio = DatosEnvio(
+      nombreDestinatario: nombre,
+      telefono: telefono,
+      departamento: _datosEnvio['departamento']!.trim(),
+      ciudad: _datosEnvio['ciudad']!.trim(),
+      direccion: _datosEnvio['direccion']!.trim(),
+    );
+
+    try {
+      final creado = await repo.crear(
+        lineas: [
+          for (final l in resumen.lineas)
+            LineaPedidoNueva(
+              idVariante: l.variante.idVariante,
+              cantidad: l.item.cantidad,
+            ),
+        ],
+        envio: envio,
+        compradora: DatosCompradora(
+          nombre: nombre,
+          correo: correo,
+          telefono: telefono,
+        ),
+        metodo: metodo,
+      );
+      if (!mounted) return;
+
+      // Lo que se muestra en la confirmación, armado con lo que respondió la
+      // base de datos. Si hay sesión, enseguida se vuelve a leer todo de allí.
+      final ahora = DateTime.now();
+      final comprador =
+          _sesion ??
+          Cliente(
+            idCliente: creado.idCliente,
+            nombre: nombre,
+            correo: correo,
+            telefono: telefono,
+            cuentaRegistrada: false,
+            fechaRegistro: ahora,
+          );
+      final id = creado.idPedido;
+      setState(() {
+        _clientes = [
+          for (final c in _clientes)
+            if (c.idCliente != comprador.idCliente) c,
+          comprador,
+        ];
+        _pedidos = [
+          Pedido(
+            idPedido: id,
+            idCliente: comprador.idCliente,
+            idPromocion: resumen.promocion?.idPromocion,
+            fecha: ahora,
+            estadoActual: EstadoPedido.pendiente,
+            subtotal: creado.subtotal,
+            descuento: creado.descuento,
+            total: creado.total,
+            metodoPago: metodo,
+          ),
+          ..._pedidos.where((p) => p.idPedido != id),
+        ];
+        _detalles = [
+          for (var i = 0; i < resumen.lineas.length; i++)
+            DetallePedido(
+              idDetalle: id * 1000 + i,
+              idPedido: id,
+              idVariante: resumen.lineas[i].variante.idVariante,
+              cantidad: resumen.lineas[i].item.cantidad,
+              precioUnitario: resumen.lineas[i].producto.precio,
+              subtotal: resumen.lineas[i].total,
+            ),
+          ..._detalles.where((d) => d.idPedido != id),
+        ];
+        _envios = [
+          Envio(
+            idEnvio: id,
+            idPedido: id,
+            nombreDestinatario: envio.nombreDestinatario,
+            telefono: envio.telefono,
+            departamento: envio.departamento,
+            ciudad: envio.ciudad,
+            direccion: envio.direccion,
+            costo: creado.costoEnvio,
+          ),
+          ..._envios.where((e) => e.idPedido != id),
+        ];
+        _pagos = [
+          Pago(
+            idPago: id,
+            idPedido: id,
+            monto: creado.total,
+            estado: 'pendiente',
+            fecha: ahora,
+            proveedor: metodo.valorBd,
+          ),
+          ..._pagos.where((p) => p.idPedido != id),
+        ];
+        _historial = [
+          HistorialEstado(
+            idHistorial: id * 10,
+            idPedido: id,
+            idUsuario: 0,
+            estadoNuevo: EstadoPedido.pendiente.name,
+            notificado: false,
+            fecha: ahora,
+          ),
+          ..._historial.where((h) => h.idPedido != id),
+        ];
+        _items = [];
+        _metodoPago = MetodoPago.wompi;
+        _ultimoPedido = id;
+        _mostrarErrores = false;
+        _pila = [Ruta.inicio, Ruta.confirmacion];
+      });
+
+      // El stock cambió en la base de datos: se vuelve a leer.
+      _cargarCatalogo();
+      _cargarPedidos();
+    } on ErrorPedido catch (e) {
+      if (!mounted) return;
+      _aviso(e.mensaje);
+      // Si faltó stock, lo que ve la clienta ya no es lo real: se actualiza.
+      _cargarCatalogo();
+    } finally {
+      if (mounted) setState(() => _comprando = false);
+    }
   }
 
   // ------------------------------------------------------------------ pago
@@ -927,11 +1141,19 @@ class _TinaScreenState extends State<TinaScreen> {
 
     // El stock se vuelve a comprobar al pagar.
     final resumenActual = _resumen;
+    final metodo = _metodoEfectivo;
+    final pagaEnLinea = metodo != MetodoPago.contraentrega;
     for (final linea in resumenActual.lineas) {
       if (linea.item.cantidad > linea.variante.stock) {
         _aviso('Ya no hay stock suficiente de ${linea.producto.nombre}.');
         return;
       }
+    }
+
+    // Con pedidos reales, la base de datos crea el pedido y descuenta el stock.
+    if (widget.pedidos != null) {
+      _pagarReal();
+      return;
     }
 
     final ahora = DateTime.now();
@@ -984,10 +1206,11 @@ class _TinaScreenState extends State<TinaScreen> {
       idCliente: cliente.idCliente,
       idPromocion: resumenActual.promocion?.idPromocion,
       fecha: ahora,
-      estadoActual: EstadoPedido.pagado,
+      estadoActual: pagaEnLinea ? EstadoPedido.pagado : EstadoPedido.pendiente,
       subtotal: resumenActual.subtotal,
       descuento: resumenActual.descuento,
-      total: resumenActual.total,
+      total: resumenActual.totalConEnvio,
+      metodoPago: metodo,
     );
 
     final detallesNuevos = [
@@ -1004,14 +1227,16 @@ class _TinaScreenState extends State<TinaScreen> {
         ),
     ];
 
-    // El pago de la prueba siempre sale aprobado.
+    // En el modo de ejemplo el pago en línea siempre sale aprobado; la
+    // contraentrega queda pendiente hasta que llegue la transferencia.
     final pago = Pago(
       idPago: _pagos.fold(0, (m, p) => p.idPago > m ? p.idPago : m) + 1,
       idPedido: idPedido,
-      referenciaWompi: 'WMP-${48213 + idPedido}-$numero',
+      referencia: pagaEnLinea ? 'WMP-${48213 + idPedido}-$numero' : null,
       monto: pedido.total,
-      estado: 'aprobado',
+      estado: pagaEnLinea ? 'aprobado' : 'pendiente',
       fecha: ahora,
+      proveedor: metodo.valorBd,
     );
     final comprobante = Comprobante(
       idComprobante:
@@ -1032,7 +1257,7 @@ class _TinaScreenState extends State<TinaScreen> {
       departamento: _datosEnvio['departamento']!.trim(),
       ciudad: ciudad,
       direccion: _datosEnvio['direccion']!.trim(),
-      costo: Calculos.costoEnvio(ciudad),
+      costo: resumenActual.costoEnvio,
     );
     final historialNuevo = [
       HistorialEstado(
@@ -1043,15 +1268,16 @@ class _TinaScreenState extends State<TinaScreen> {
         notificado: true,
         fecha: ahora,
       ),
-      HistorialEstado(
-        idHistorial: idHistorial + 2,
-        idPedido: idPedido,
-        idUsuario: 2,
-        estadoAnterior: EstadoPedido.pendiente.name,
-        estadoNuevo: EstadoPedido.pagado.name,
-        notificado: true,
-        fecha: ahora,
-      ),
+      if (pagaEnLinea)
+        HistorialEstado(
+          idHistorial: idHistorial + 2,
+          idPedido: idPedido,
+          idUsuario: 2,
+          estadoAnterior: EstadoPedido.pendiente.name,
+          estadoNuevo: EstadoPedido.pagado.name,
+          notificado: true,
+          fecha: ahora,
+        ),
     ];
 
     // El stock baja por cada unidad comprada.
@@ -1065,7 +1291,7 @@ class _TinaScreenState extends State<TinaScreen> {
       _pedidos = [..._pedidos, pedido];
       _detalles = [..._detalles, ...detallesNuevos];
       _pagos = [..._pagos, pago];
-      _comprobantes = [..._comprobantes, comprobante];
+      if (pagaEnLinea) _comprobantes = [..._comprobantes, comprobante];
       _envios = [..._envios, envio];
       _historial = [..._historial, ...historialNuevo];
       _variantes = [
@@ -1075,6 +1301,7 @@ class _TinaScreenState extends State<TinaScreen> {
               : v,
       ];
       _items = [];
+      _metodoPago = MetodoPago.wompi;
       _ultimoPedido = idPedido;
       _mostrarErrores = false;
       _pila = [Ruta.inicio, Ruta.confirmacion];
@@ -1232,7 +1459,32 @@ class _TinaScreenState extends State<TinaScreen> {
   }
 
   // ----------------------------------------------------------------- panel
+  Future<void> _cambiarEstadoReal(int idPedido, EstadoPedido nuevo) async {
+    final completo = _pedidosCompletos.firstWhere(
+      (p) => p.pedido.idPedido == idPedido,
+    );
+    if (completo.pedido.estadoActual == nuevo) return;
+    try {
+      await widget.pedidos!.cambiarEstado(idPedido, nuevo);
+      if (!mounted) return;
+      await _cargarPedidos();
+      // Al cancelar, el stock vuelve: se actualiza el catálogo.
+      if (nuevo == EstadoPedido.cancelado) _cargarCatalogo();
+      if (!mounted) return;
+      _aviso('${completo.pedido.codigo} ahora está: ${nuevo.etiqueta}.');
+    } on ErrorPedido catch (e) {
+      if (!mounted) return;
+      _aviso(e.mensaje);
+      // La lista se vuelve a leer para que el selector muestre el estado real.
+      _cargarPedidos();
+    }
+  }
+
   void _cambiarEstado(int idPedido, EstadoPedido nuevo) {
+    if (widget.pedidos != null) {
+      _cambiarEstadoReal(idPedido, nuevo);
+      return;
+    }
     final completo = _pedidosCompletos.firstWhere(
       (p) => p.pedido.idPedido == idPedido,
     );
@@ -1380,10 +1632,14 @@ class _TinaScreenState extends State<TinaScreen> {
         onNav: _onNav,
         resumen: _resumen,
         promociones: _promociones,
-        modo: _modo,
+        modo: _conCuenta ? ModoCompra.cuenta : _modo,
         haySesion: _sesion != null,
         valores: _datosEnvio,
         mostrarErrores: _mostrarErrores,
+        metodo: _metodoEfectivo,
+        puedeContraentrega: _puedeContraentrega,
+        ocupado: _comprando,
+        onMetodo: _elegirMetodo,
         onModo: _elegirModo,
         onCampo: _escribirEnvio,
         onPagar: _pagar,
@@ -1457,7 +1713,8 @@ class _TinaScreenState extends State<TinaScreen> {
       onNav: _onNav,
       codigoPedido: completo.pedido.codigo,
       numeroComprobante: completo.comprobante?.numero ?? '—',
-      referenciaPago: completo.pago?.referenciaWompi ?? '—',
+      referenciaPago: completo.pago?.referencia ?? '—',
+      contraentrega: completo.pedido.metodoPago == MetodoPago.contraentrega,
       totalPagado: formatoPesos(completo.pedido.total),
       unidadesCarrito: _unidades,
       onSeguir: _irInicio,
