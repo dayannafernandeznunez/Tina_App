@@ -14,10 +14,10 @@ class ConfirmacionPage extends StatelessWidget {
     required this.totalPagado,
     required this.unidadesCarrito,
     required this.onSeguir,
-    required this.onVerPedido,
     required this.onLogo,
     required this.onCarrito,
     required this.onNav,
+    this.onVerPedido,
     this.contraentrega = false,
   });
 
@@ -31,7 +31,9 @@ class ConfirmacionPage extends StatelessWidget {
   final String totalPagado;
   final int unidadesCarrito;
   final VoidCallback onSeguir;
-  final VoidCallback onVerPedido;
+
+  /// Sin sesión no hay dónde ver el pedido; entonces el botón no se muestra.
+  final VoidCallback? onVerPedido;
   final VoidCallback onLogo;
   final VoidCallback onCarrito;
   final ValueChanged<DestinoNav> onNav;
@@ -48,11 +50,12 @@ class ConfirmacionPage extends StatelessWidget {
         spacing: 8,
         children: [
           TinaBoton(etiqueta: 'Seguir comprando', onPressed: onSeguir),
-          TinaBoton(
-            etiqueta: 'Ver mi pedido',
-            variante: VarianteBoton.secundario,
-            onPressed: onVerPedido,
-          ),
+          if (onVerPedido != null)
+            TinaBoton(
+              etiqueta: 'Ver mi pedido',
+              variante: VarianteBoton.secundario,
+              onPressed: onVerPedido!,
+            ),
         ],
       ),
       cuerpo: TinaLista(

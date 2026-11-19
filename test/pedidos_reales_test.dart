@@ -30,6 +30,18 @@ class _PedidosFalsos implements PedidosRepositorio {
   final List<(int, EstadoPedido)> cambios = [];
   int cargas = 0;
 
+  static const token = '11111111-2222-3333-4444-555555555555';
+
+  /// Si no es nulo, abrir la página de pago de Wompi falla con este mensaje.
+  String? errorPago;
+  final List<(int, String)> pagosIniciados = [];
+  final List<(int, String)> cancelados = [];
+
+  /// Lo que responde cada consulta de estado; la última se repite. Si la lista
+  /// está vacía, la consulta falla como si no hubiera internet.
+  List<EstadoPagoPedido> estados = [];
+  int consultas = 0;
+
   @override
   Future<PedidoCreado> crear({
     required List<LineaPedidoNueva> lineas,
@@ -53,7 +65,30 @@ class _PedidosFalsos implements PedidosRepositorio {
       descuento: 4000,
       costoEnvio: 0,
       total: 36000,
+      token: token,
     );
+  }
+
+  @override
+  Future<String> iniciarPagoWompi(int idPedido, String token) async {
+    if (errorPago != null) throw ErrorPedido(errorPago!);
+    pagosIniciados.add((idPedido, token));
+    return 'https://checkout.wompi.co/p/?pedido=$idPedido';
+  }
+
+  @override
+  Future<EstadoPagoPedido> consultarEstado(int idPedido, String token) async {
+    if (estados.isEmpty) {
+      throw const ErrorPedido('No pudimos conectar.');
+    }
+    final i = consultas < estados.length ? consultas : estados.length - 1;
+    consultas++;
+    return estados[i];
+  }
+
+  @override
+  Future<void> cancelarPedidoPropio(int idPedido, String token) async {
+    cancelados.add((idPedido, token));
   }
 
   @override
@@ -267,6 +302,9 @@ Future<void> _abrir(
   required _PedidosFalsos pedidos,
   required _CatalogoContado catalogo,
   SesionRepositorio? sesiones,
+  bool pagoEnLinea = false,
+  List<String>? urlsAbiertas,
+  Uri? urlInicial,
 }) async {
   TinaTipografia.usarFuenteWeb = false;
   tester.view.physicalSize = const Size(450, 4000);
@@ -279,6 +317,10 @@ Future<void> _abrir(
       sesiones: sesiones ?? _SesionVacia(),
       pedidos: pedidos,
       admin: _AdminSinFotos(),
+      pagoEnLinea: pagoEnLinea,
+      abrirUrl: (url) async => urlsAbiertas?.add(url),
+      urlInicial: urlInicial,
+      pausaSondeo: Duration.zero,
     ),
   );
   await tester.pumpAndSettle();
@@ -382,6 +424,236 @@ void main() {
       );
       expect(find.text('Finalizar compra'), findsOneWidget);
       expect(catalogo.cargas, greaterThan(cargasAntes));
+    });
+  });
+
+  group('Pago en línea con Wompi', () {
+    EstadoPagoPedido estado({
+      String estado = 'pendiente',
+      String pago = 'pendiente',
+    }) => EstadoPagoPedido(
+      idPedido: 31,
+      codigo: 'TINA-0031',
+      estado: estado,
+      pagoEstado: pago,
+      total: 36000,
+      referencia: 'TINA-0031-1',
+      comprobante: pago == 'aprobado' ? 'COMP-0031' : null,
+    );
+
+    final urlVuelta = Uri.parse(
+      'https://tina.co/?pedido=31&t=${_PedidosFalsos.token}&id=1234-5678-90',
+    );
+
+    testWidgets('crea el pedido y manda a la clienta a la página de pago', (
+      tester,
+    ) async {
+      final pedidos = _PedidosFalsos();
+      final urls = <String>[];
+      await _abrir(
+        tester,
+        pedidos: pedidos,
+        catalogo: _CatalogoContado(),
+        pagoEnLinea: true,
+        urlsAbiertas: urls,
+      );
+      await _alCheckout(tester, ciudad: 'Bogotá', departamento: 'Cundinamarca');
+
+      await _tocar(tester, _llave('boton-pagar'));
+
+      expect(pedidos.creados.single.metodo, MetodoPago.wompi);
+      expect(pedidos.pagosIniciados, [(31, _PedidosFalsos.token)]);
+      expect(urls, ['https://checkout.wompi.co/p/?pedido=31']);
+      expect(pedidos.cancelados, isEmpty);
+    });
+
+    testWidgets(
+      'si no se puede abrir el pago, cancela el pedido y conserva el carrito',
+      (tester) async {
+        final pedidos = _PedidosFalsos()
+          ..errorPago = 'No pudimos abrir la página de pago.';
+        final catalogo = _CatalogoContado();
+        final urls = <String>[];
+        await _abrir(
+          tester,
+          pedidos: pedidos,
+          catalogo: catalogo,
+          pagoEnLinea: true,
+          urlsAbiertas: urls,
+        );
+        await _alCheckout(
+          tester,
+          ciudad: 'Bogotá',
+          departamento: 'Cundinamarca',
+        );
+        final cargasAntes = catalogo.cargas;
+
+        await _tocar(tester, _llave('boton-pagar'));
+
+        expect(urls, isEmpty);
+        expect(pedidos.cancelados, [(31, _PedidosFalsos.token)]);
+        expect(
+          find.text('No pudimos abrir la página de pago.'),
+          findsOneWidget,
+        );
+        expect(find.text('Finalizar compra'), findsOneWidget);
+        expect(catalogo.cargas, greaterThan(cargasAntes));
+      },
+    );
+
+    testWidgets('al volver con el pago aprobado muestra la confirmación', (
+      tester,
+    ) async {
+      final pedidos = _PedidosFalsos()
+        ..estados = [estado(estado: 'pagado', pago: 'aprobado')];
+      await _abrir(
+        tester,
+        pedidos: pedidos,
+        catalogo: _CatalogoContado(),
+        pagoEnLinea: true,
+        urlInicial: urlVuelta,
+      );
+
+      expect(find.text('confirmado!'), findsOneWidget);
+      expect(find.text('TINA-0031'), findsOneWidget);
+      expect(find.text('COMP-0031'), findsOneWidget);
+      expect(find.text(r'$36.000'), findsOneWidget);
+      // Sin cuenta no hay dónde ver el pedido.
+      expect(find.text('Ver mi pedido'), findsNothing);
+    });
+
+    testWidgets(
+      'si Wompi tarda en avisar, vuelve a consultar hasta que llegue',
+      (tester) async {
+        final pedidos = _PedidosFalsos()
+          ..estados = [
+            estado(),
+            estado(),
+            estado(estado: 'pagado', pago: 'aprobado'),
+          ];
+        await _abrir(
+          tester,
+          pedidos: pedidos,
+          catalogo: _CatalogoContado(),
+          pagoEnLinea: true,
+          urlInicial: urlVuelta,
+        );
+
+        expect(pedidos.consultas, 3);
+        expect(find.text('confirmado!'), findsOneWidget);
+      },
+    );
+
+    testWidgets('si nunca llega la respuesta, deja revisar otra vez', (
+      tester,
+    ) async {
+      final pedidos = _PedidosFalsos()..estados = [estado()];
+      await _abrir(
+        tester,
+        pedidos: pedidos,
+        catalogo: _CatalogoContado(),
+        pagoEnLinea: true,
+        urlInicial: urlVuelta,
+      );
+
+      expect(pedidos.consultas, 8);
+      expect(find.text('en revisión'), findsOneWidget);
+      expect(find.text('confirmado!'), findsNothing);
+
+      pedidos.estados = [estado(estado: 'pagado', pago: 'aprobado')];
+      pedidos.consultas = 0;
+      await _tocar(tester, find.text('Revisar otra vez'));
+      expect(find.text('confirmado!'), findsOneWidget);
+    });
+
+    testWidgets(
+      'un pago rechazado deja intentar de nuevo con el mismo pedido',
+      (tester) async {
+        final pedidos = _PedidosFalsos()..estados = [estado(pago: 'rechazado')];
+        final urls = <String>[];
+        await _abrir(
+          tester,
+          pedidos: pedidos,
+          catalogo: _CatalogoContado(),
+          pagoEnLinea: true,
+          urlsAbiertas: urls,
+          urlInicial: urlVuelta,
+        );
+
+        expect(find.text('procesar el pago'), findsOneWidget);
+        expect(find.text('TINA-0031'), findsOneWidget);
+
+        await _tocar(tester, find.text('Intentar de nuevo'));
+
+        expect(pedidos.creados, isEmpty);
+        expect(pedidos.pagosIniciados, [(31, _PedidosFalsos.token)]);
+        expect(urls, ['https://checkout.wompi.co/p/?pedido=31']);
+      },
+    );
+
+    testWidgets('un pedido cancelado no se puede pagar', (tester) async {
+      final pedidos = _PedidosFalsos()
+        ..estados = [estado(estado: 'cancelado', pago: 'rechazado')];
+      await _abrir(
+        tester,
+        pedidos: pedidos,
+        catalogo: _CatalogoContado(),
+        pagoEnLinea: true,
+        urlInicial: urlVuelta,
+      );
+
+      expect(find.text('cancelado'), findsOneWidget);
+      expect(find.text('Intentar de nuevo'), findsNothing);
+    });
+
+    testWidgets(
+      'un pago llegado a un pedido ya cancelado avisa de la devolución',
+      (tester) async {
+        final pedidos = _PedidosFalsos()
+          ..estados = [estado(estado: 'cancelado', pago: 'aprobado')];
+        await _abrir(
+          tester,
+          pedidos: pedidos,
+          catalogo: _CatalogoContado(),
+          pagoEnLinea: true,
+          urlInicial: urlVuelta,
+        );
+
+        expect(find.textContaining('devolverte el dinero'), findsOneWidget);
+        expect(find.text('confirmado!'), findsNothing);
+      },
+    );
+
+    testWidgets('sin internet al volver, avisa y deja reintentar', (
+      tester,
+    ) async {
+      final pedidos = _PedidosFalsos(); // sin estados: la consulta falla
+      await _abrir(
+        tester,
+        pedidos: pedidos,
+        catalogo: _CatalogoContado(),
+        pagoEnLinea: true,
+        urlInicial: urlVuelta,
+      );
+
+      expect(find.text('revisar tu pago'), findsOneWidget);
+      expect(find.text('Revisar otra vez'), findsOneWidget);
+    });
+
+    testWidgets('una dirección sin pedido abre la tienda normal', (
+      tester,
+    ) async {
+      final pedidos = _PedidosFalsos();
+      await _abrir(
+        tester,
+        pedidos: pedidos,
+        catalogo: _CatalogoContado(),
+        pagoEnLinea: true,
+        urlInicial: Uri.parse('https://tina.co/?utm=correo'),
+      );
+
+      expect(pedidos.consultas, 0);
+      expect(find.text('Confirmando'), findsNothing);
     });
   });
 

@@ -14,7 +14,7 @@ comprobantes, envíos, historial).
 | Cuentas e ingreso (clientas y administradora) | **Reales**: Supabase Auth, un solo ingreso para todas |
 | Pedidos (crear, ver, cambiar estado), stock, descuentos y envío | **Reales**: los crea y calcula Supabase |
 | Contraentrega en Cali | **Real**: pedido pendiente que se coordina por WhatsApp |
-| Pago en línea con Wompi | **Pendiente**: todavía no está conectado. Mientras tanto solo se puede comprar con contraentrega, en Cali |
+| Pago en línea con Wompi | **Conectado, en modo de pruebas**: la app lleva a la página de pago, Wompi avisa a una función de Supabase y el pedido pasa a "Pagado". Falta activarlo en tu proyecto (ver [`supabase/LEEME.md`](supabase/LEEME.md)) y pasar a producción |
 
 Sin conexión, o en las pruebas, la app usa **datos de ejemplo** coherentes con
 el modelo.
@@ -177,10 +177,13 @@ test/            Pruebas de datos, lógica, componentes, ingreso, panel y recorr
 
 ## Pendientes
 
-- **Pago en línea con Wompi:** todavía no está conectado (`pagoEnLinea` queda
-  apagado). Mientras tanto, fuera de Cali la compra avisa que el pago en línea
-  estará disponible pronto. Falta crear el pago en Wompi, recibir su aviso de
-  pago aprobado y marcar el pedido como pagado.
+- **Pago en línea con Wompi:** el código está listo y probado, pero hay que
+  activarlo en Supabase (script 7, cuatro secretos, dos funciones y la *URL de
+  Eventos* en Wompi; ver [`supabase/LEEME.md`](supabase/LEEME.md)), probarlo con
+  las tarjetas de pruebas y luego pasar a las llaves de producción.
+- **Pedidos sin pagar:** si una clienta no termina de pagar en Wompi, el pedido
+  queda pendiente con el stock apartado hasta que la vendedora lo cancele desde
+  el panel. Falta que se venzan solos.
 - **Apple Pay:** necesita una pasarela distinta de Wompi (se está evaluando
   Kushki, que lo tiene en beta para Colombia, solo con Visa y Mastercard).
 - **Aviso por WhatsApp** a la vendedora cuando entra un pedido.

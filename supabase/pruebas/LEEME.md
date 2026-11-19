@@ -22,3 +22,20 @@ node prueba_pedidos.mjs
 ```
 
 Al final dice cuántas comprobaciones salieron bien y mal.
+
+## Prueba de las funciones del servidor de Wompi
+
+`prueba_wompi.mjs` prueba `iniciar-pago` y `wompi-eventos` sin internet: la firma
+de integridad contra el ejemplo oficial de la documentación de Wompi, la
+verificación de la firma de los avisos (con avisos alterados y sin firma), la
+dirección de la página de pago y cómo responde cada caso. Necesita Node 22 o más
+nuevo (lee los archivos `.ts` directamente):
+
+```bash
+node prueba_wompi.mjs
+```
+
+Nota: el ejemplo de aviso de la documentación de Wompi muestra el resultado
+`3476DDA5…`, pero ese número no sale de los valores que la propia documentación
+usa (con ellos, SHA-256 da `5A18EC5E…`). Por eso la prueba compara con el cálculo
+de la librería de Node siguiendo los pasos de la documentación.

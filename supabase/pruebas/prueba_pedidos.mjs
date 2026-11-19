@@ -11,7 +11,7 @@ const db = new PGlite();
 
 // Lo mínimo de Supabase que los scripts necesitan: roles, auth y storage.
 await db.exec(`
-  create role anon nologin; create role authenticated nologin;
+  create role anon nologin; create role authenticated nologin; create role service_role nologin;
   create schema auth;
   create table auth.users (id uuid primary key default gen_random_uuid(),
     email text, raw_user_meta_data jsonb default '{}'::jsonb);
@@ -30,6 +30,7 @@ for (const f of [
   'migrations/20261114000003_cuentas_de_clientas.sql',
   'seed.sql',
   'migrations/20261118000004_pedidos_reales.sql',
+  'migrations/20261118000005_pago_wompi.sql',
 ]) {
   try {
     await db.exec(leer(f));
@@ -40,12 +41,12 @@ for (const f of [
 }
 // Como en Supabase: los roles de la app pueden usar las tablas; RLS decide qué.
 await db.exec(`
-  grant usage on schema public, auth to anon, authenticated;
+  grant usage on schema public, auth to anon, authenticated, service_role;
   grant all on all tables in schema public to anon, authenticated;
   grant all on all sequences in schema public to anon, authenticated;
   grant select on auth.users to authenticated;
 `);
-console.log('Los 5 scripts corren sin errores.\n');
+console.log('Los 6 scripts corren sin errores.\n');
 
 let ok = 0, mal = 0;
 const igual = (nombre, real, esperado) => {
@@ -190,6 +191,94 @@ igual('no ve el detalle de los demás', (await q('select 1 from detalle_pedido d
 await como(ADMIN);
 igual('la administradora ve todos', (await q('select 1 from pedido')).length >= 7, true);
 await db.exec('reset role');
+
+
+// ============================================================ pago con Wompi
+console.log('\n--- Pago con Wompi: token, intentos y resultado');
+await como(null);   // una visitante, sin sesión
+const ref = (id, n) => `TINA-${String(id).padStart(4, '0')}-${n}`;
+const COMO_SERVICIO = async (f) => { await db.exec('set role service_role'); try { return await f(); } finally { await db.exec('reset role'); } };
+const estadoDe = async (id) => (await uno('select estado_actual from pedido where id_pedido=$1', [id])).estado_actual;
+const pagoDe = async (id) => await uno('select * from pago where id_pedido=$1', [id]);
+
+const stockAntesW = await stock(11);                                  // pulsera L, 17.000
+r = await pedir([{ id_variante: 11, cantidad: 1 }]);
+const idW = r.id_pedido, tokW = r.token, totalW = r.total;
+igual('crear_pedido devuelve el token del pedido', typeof tokW, 'string');
+igual('el total incluye el envío', totalW, 17000 + 5000);
+
+await db.exec('set role anon');
+const veo = (await uno('select public.ver_estado_pedido($1, $2::uuid) as r', [idW, tokW])).r;
+igual('con su token la compradora ve el estado', [veo.estado, veo.total, veo.pago_estado], ['pendiente', totalW, 'pendiente']);
+await falla('con otro token no ve nada', `select public.ver_estado_pedido($1, '00000000-0000-0000-0000-000000000000'::uuid)`, [idW], 'No encontramos ese pedido');
+await falla('la app no puede iniciar un pago por su cuenta', `select public.iniciar_pago($1, $2::uuid)`, [idW, tokW], 'permission denied');
+await falla('ni registrar un resultado de pago', `select public.registrar_resultado_pago('TINA-0001-1','APPROVED',100,'x')`, [], 'permission denied');
+await falla('ni aprobar un pago', `select public.aprobar_pago($1)`, [idW], 'permission denied');
+await db.exec('reset role');
+
+let ini = (await COMO_SERVICIO(() => uno('select public.iniciar_pago($1, $2::uuid) as r', [idW, tokW]))).r;
+igual('primer intento: referencia nueva', ini.referencia, ref(idW, 1));
+igual('el monto sale del pedido, en centavos', ini.monto_en_centavos, totalW * 100);
+await falla('con un token ajeno no se inicia el pago', `select public.iniciar_pago($1, '00000000-0000-0000-0000-000000000000'::uuid)`, [idW], 'No encontramos ese pedido').catch(() => {});
+await COMO_SERVICIO(() => falla('token ajeno', `select public.iniciar_pago($1, '00000000-0000-0000-0000-000000000000'::uuid)`, [idW], 'No encontramos ese pedido'));
+
+await COMO_SERVICIO(() => falla('un monto distinto no aprueba nada', `select public.registrar_resultado_pago($1,'APPROVED',100,'t0')`, [ref(idW, 1)], 'no coincide'));
+igual('el pedido sigue pendiente', await estadoDe(idW), 'pendiente');
+await COMO_SERVICIO(() => falla('una referencia ajena se rechaza', `select public.registrar_resultado_pago('OTRA-TIENDA-1','APPROVED',2200000,'t0')`, [], 'no es de esta tienda'));
+
+let res = (await COMO_SERVICIO(() => uno(`select public.registrar_resultado_pago($1,'DECLINED',$2,'t1') as r`, [ref(idW, 1), totalW * 100]))).r;
+igual('un pago rechazado queda rechazado', [res.resultado, (await pagoDe(idW)).estado], ['rechazado', 'rechazado']);
+igual('y el pedido sigue pendiente para reintentar', await estadoDe(idW), 'pendiente');
+
+ini = (await COMO_SERVICIO(() => uno('select public.iniciar_pago($1, $2::uuid) as r', [idW, tokW]))).r;
+igual('el reintento usa otra referencia', ini.referencia, ref(idW, 2));
+igual('y el pago vuelve a pendiente', (await pagoDe(idW)).estado, 'pendiente');
+
+res = (await COMO_SERVICIO(() => uno(`select public.registrar_resultado_pago($1,'APPROVED',$2,'t2') as r`, [ref(idW, 2), totalW * 100]))).r;
+igual('el pago aprobado pasa el pedido a pagado', [res.resultado, await estadoDe(idW)], ['aprobado', 'pagado']);
+const pg = await pagoDe(idW);
+igual('el pago guarda la referencia y queda aprobado', [pg.estado, pg.referencia], ['aprobado', ref(idW, 2)]);
+igual('se crea el comprobante', (await q('select c.numero from comprobante c join pago p on p.id_pago=c.id_pago where p.id_pedido=$1', [idW])).map((x) => x.numero), [`C-${String(idW).padStart(4, '0')}`]);
+await COMO_SERVICIO(() => db.query(`select public.registrar_resultado_pago($1,'APPROVED',$2,'t2')`, [ref(idW, 2), totalW * 100]));
+igual('si Wompi repite el aviso no se duplica nada', (await q('select 1 from comprobante c join pago p on p.id_pago=c.id_pago where p.id_pedido=$1', [idW])).length, 1);
+igual('el historial dice quién lo pagó', (await q(`select u.rol from historial_estado h join usuario u on u.id_usuario=h.id_usuario where h.id_pedido=$1 and h.estado_nuevo='pagado'`, [idW])).map((x) => x.rol), ['sistema']);
+await COMO_SERVICIO(() => falla('un pedido ya pagado no se vuelve a cobrar', `select public.iniciar_pago($1, $2::uuid)`, [idW, tokW], 'ya no está pendiente'));
+igual('el stock quedó descontado', await stock(11), stockAntesW - 1);
+
+console.log('\n--- Anulación, cancelar y pagos tardíos');
+r = await pedir([{ id_variante: 11, cantidad: 1 }]);
+const idV = r.id_pedido;
+await COMO_SERVICIO(() => db.query(`select public.registrar_resultado_pago($1,'APPROVED',$2,'tv')`, [ref(idV, 1), r.total * 100]));
+const stockPagado = await stock(11);
+await COMO_SERVICIO(() => db.query(`select public.registrar_resultado_pago($1,'VOIDED',$2,'tv')`, [ref(idV, 1), r.total * 100]));
+igual('un pago anulado cancela el pedido', await estadoDe(idV), 'cancelado');
+igual('y devuelve el stock', await stock(11), stockPagado + 1);
+
+r = await pedir([{ id_variante: 11, cantidad: 1 }]);
+const idC = r.id_pedido, tokC = r.token, stockC = await stock(11);
+await db.exec('set role anon');
+await falla('cancelar con un token ajeno no se puede', `select public.cancelar_pedido_propio($1, '00000000-0000-0000-0000-000000000000'::uuid)`, [idC], 'No encontramos ese pedido');
+await db.query('select public.cancelar_pedido_propio($1, $2::uuid)', [idC, tokC]);
+await db.exec('reset role');
+igual('con su token la compradora cancela su pedido pendiente', await estadoDe(idC), 'cancelado');
+igual('y el stock vuelve', await stock(11), stockC + 1);
+await db.exec('set role anon');
+await falla('un pedido cancelado no se cancela otra vez', `select public.cancelar_pedido_propio($1, $2::uuid)`, [idC, tokC], 'sigue pendiente');
+await db.exec('reset role');
+
+res = (await COMO_SERVICIO(() => uno(`select public.registrar_resultado_pago($1,'APPROVED',$2,'tc') as r`, [ref(idC, 1), r.total * 100]))).r;
+igual('un pago que llega a un pedido cancelado queda marcado para devolver', [res.resultado, await estadoDe(idC), (await pagoDe(idC)).estado], ['pago_en_pedido_cancelado', 'cancelado', 'aprobado']);
+
+r = await pedir([{ id_variante: 6, cantidad: 1 }], 'contraentrega', envio('Cali', 'Valle del Cauca'));
+await COMO_SERVICIO(() => falla('la contraentrega no se paga con Wompi', `select public.iniciar_pago($1, $2::uuid)`, [r.id_pedido, r.token], 'no se paga con Wompi'));
+
+// La administradora sigue pudiendo cancelar (ahora con la función interna).
+await como(ADMIN);
+r = await pedir([{ id_variante: 11, cantidad: 1 }]);
+const stockAdmin = await stock(11);
+await db.query(`select public.cambiar_estado_pedido($1, 'cancelado')`, [r.id_pedido]);
+igual('la administradora cancela y el stock vuelve', [await estadoDe(r.id_pedido), await stock(11)], ['cancelado', stockAdmin + 1]);
+await como(null);
 
 console.log(`\n${ok} bien, ${mal} mal`);
 process.exit(mal ? 1 : 0);

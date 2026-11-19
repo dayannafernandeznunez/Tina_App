@@ -24,8 +24,10 @@ import '../pages/panel_page.dart';
 import '../pages/panel_fotos_articulos_page.dart';
 import '../pages/panel_fotos_sitio_page.dart';
 import '../pages/panel_productos_page.dart';
+import '../pages/pago_retorno_page.dart';
 import '../pages/pedido_page.dart';
 import '../theme/tina_tema.dart';
+import '../utils/abrir_url.dart';
 import '../utils/adaptable.dart';
 import '../utils/formato.dart';
 
@@ -42,6 +44,9 @@ enum Ruta {
   panel,
   productoEditar,
   pedido,
+
+  /// A donde vuelve la clienta después de la página de pago de Wompi.
+  pagoRetorno,
 }
 
 /// Screen anfitriona de la app.
@@ -59,7 +64,20 @@ class TinaScreen extends StatefulWidget {
     this.admin,
     this.pagoEnLinea = false,
     this.selectorFotos = const SelectorFotosDispositivo(),
+    this.abrirUrl = abrirEnLaMismaPestana,
+    this.urlInicial,
+    this.pausaSondeo = const Duration(seconds: 2),
   });
+
+  /// Cómo se abre la página de pago de Wompi.
+  final AbrirUrl abrirUrl;
+
+  /// La dirección con la que se abrió la app. Si trae `?pedido=…&t=…`, la
+  /// clienta viene de pagar en Wompi. Por defecto es la de la pestaña.
+  final Uri? urlInicial;
+
+  /// Cuánto se espera entre una consulta y otra del estado del pago.
+  final Duration pausaSondeo;
 
   /// De dónde se lee el catálogo (categorías, productos, variantes, promociones
   /// y fotos). Si es `null`, la app trabaja solo con los datos simulados.
@@ -161,6 +179,14 @@ class _TinaScreenState extends State<TinaScreen> {
   int? _idPedidoVer;
   int? _ultimoPedido;
 
+  // ------------------------------------------- vuelta de la página de pago
+  int? _retornoId;
+  String? _retornoToken;
+  EstadoPagoPedido? _retornoEstado;
+  bool _retornoVerificando = false;
+  bool _retornoSinConexion = false;
+  bool _retornoReintentando = false;
+
   // ------------------------------------------------------------ derivados
   int get _unidades => _items.fold(0, (s, i) => s + i.cantidad);
 
@@ -216,6 +242,17 @@ class _TinaScreenState extends State<TinaScreen> {
     ],
   );
 
+  /// Foto principal de cada producto que tenga fotos (id del producto ->
+  /// dirección), en el orden que eligió la administradora.
+  Map<int, String> get _fotosPrincipales {
+    final primeras = <int, ImagenProducto>{};
+    for (final i in _imagenes) {
+      final actual = primeras[i.idProducto];
+      if (actual == null || i.orden < actual.orden) primeras[i.idProducto] = i;
+    }
+    return {for (final e in primeras.entries) e.key: e.value.url};
+  }
+
   List<ProductoVista> _vistas({String? categoria}) => [
     for (final p in _productos)
       if (p.activo) _vista(p),
@@ -256,6 +293,18 @@ class _TinaScreenState extends State<TinaScreen> {
       _comprobantes = [];
       _historial = [];
       _restaurarSesion();
+    }
+
+    // ¿Viene de pagar en Wompi? Wompi la devuelve a ?pedido=<id>&t=<llave>.
+    final inicial = widget.urlInicial ?? Uri.base;
+    final id = int.tryParse(inicial.queryParameters['pedido'] ?? '');
+    final token = inicial.queryParameters['t'];
+    if (widget.pedidos != null && id != null && token != null) {
+      _retornoId = id;
+      _retornoToken = token;
+      _retornoVerificando = true;
+      _pila = [Ruta.inicio, Ruta.pagoRetorno];
+      _verificarPago();
     }
   }
 
@@ -1028,6 +1077,17 @@ class _TinaScreenState extends State<TinaScreen> {
       );
       if (!mounted) return;
 
+      // Pago en línea: el pedido ya existe y tiene el stock apartado. Se abre la
+      // página de pago de Wompi; la clienta vuelve cuando termine.
+      if (metodo != MetodoPago.contraentrega) {
+        await _irAPagarEnWompi(
+          creado.idPedido,
+          creado.token,
+          cancelarSiFalla: true,
+        );
+        return;
+      }
+
       // Lo que se muestra en la confirmación, armado con lo que respondió la
       // base de datos. Si hay sesión, enseguida se vuelve a leer todo de allí.
       final ahora = DateTime.now();
@@ -1127,6 +1187,90 @@ class _TinaScreenState extends State<TinaScreen> {
     } finally {
       if (mounted) setState(() => _comprando = false);
     }
+  }
+
+  /// Pide el enlace de pago y manda a la clienta a Wompi. Si no se puede abrir y
+  /// el pedido es nuevo ([cancelarSiFalla]), se cancela para devolver el stock.
+  /// Devuelve `true` si salió hacia Wompi.
+  Future<bool> _irAPagarEnWompi(
+    int idPedido,
+    String? token, {
+    required bool cancelarSiFalla,
+  }) async {
+    final repo = widget.pedidos!;
+    final itemsPrevios = _items;
+    try {
+      if (token == null) {
+        throw const ErrorPedido('No pudimos abrir la página de pago.');
+      }
+      final url = await repo.iniciarPagoWompi(idPedido, token);
+      // El carrito ya se volvió pedido: se vacía antes de salir.
+      if (mounted && cancelarSiFalla) setState(() => _items = []);
+      await widget.abrirUrl(url);
+      return true;
+    } on ErrorPedido catch (e) {
+      if (mounted) _aviso(e.mensaje);
+    } catch (_) {
+      if (mounted) _aviso('No pudimos abrir la página de pago.');
+    }
+    if (cancelarSiFalla && token != null) {
+      try {
+        await repo.cancelarPedidoPropio(idPedido, token);
+      } catch (_) {
+        // El pedido queda pendiente; la vendedora puede cancelarlo desde el panel.
+      }
+      if (mounted) setState(() => _items = itemsPrevios);
+      _cargarCatalogo();
+    }
+    return false;
+  }
+
+  /// Después de pagar, pregunta a la base de datos cómo quedó el pago. Wompi
+  /// avisa a la tienda por su cuenta, así que puede tardar unos segundos.
+  Future<void> _verificarPago() async {
+    final repo = widget.pedidos!;
+    final id = _retornoId!;
+    final token = _retornoToken!;
+    const intentos = 8;
+    for (var i = 0; i < intentos; i++) {
+      try {
+        final estado = await repo.consultarEstado(id, token);
+        if (!mounted) return;
+        setState(() {
+          _retornoEstado = estado;
+          _retornoSinConexion = false;
+        });
+        if (!estado.esperando) break;
+      } on ErrorPedido {
+        if (!mounted) return;
+        setState(() => _retornoSinConexion = true);
+        break;
+      }
+      if (i < intentos - 1) await Future<void>.delayed(widget.pausaSondeo);
+      if (!mounted) return;
+    }
+    setState(() => _retornoVerificando = false);
+    if (_retornoEstado?.pagado ?? false) {
+      // El stock y los pedidos cambiaron: se vuelven a leer.
+      _cargarCatalogo();
+      _cargarPedidos();
+    }
+  }
+
+  void _revisarPagoOtraVez() {
+    setState(() {
+      _retornoVerificando = true;
+      _retornoSinConexion = false;
+    });
+    _verificarPago();
+  }
+
+  /// El pago fue rechazado: abre otra vez Wompi con el mismo pedido.
+  Future<void> _reintentarPago() async {
+    if (_retornoReintentando) return;
+    setState(() => _retornoReintentando = true);
+    await _irAPagarEnWompi(_retornoId!, _retornoToken, cancelarSiFalla: false);
+    if (mounted) setState(() => _retornoReintentando = false);
   }
 
   // ------------------------------------------------------------------ pago
@@ -1612,6 +1756,7 @@ class _TinaScreenState extends State<TinaScreen> {
       ),
       Ruta.carrito => CarritoPage(
         onLogo: _irInicio,
+        fotos: _fotosPrincipales,
         resumen: _resumen,
         promociones: _promociones,
         nota: Calculos.notaDescuento(
@@ -1673,6 +1818,7 @@ class _TinaScreenState extends State<TinaScreen> {
         ),
         onAtras: _volver,
       ),
+      Ruta.pagoRetorno => _pagoRetorno(),
     };
     return MaterialPage<void>(
       key: ValueKey(ruta),
@@ -1721,6 +1867,38 @@ class _TinaScreenState extends State<TinaScreen> {
       onVerPedido: () => _verPedido(completo.pedido.idPedido),
       onLogo: _irInicio,
       onCarrito: _irCarrito,
+    );
+  }
+
+  Widget _pagoRetorno() {
+    final e = _retornoEstado;
+    if (e != null && e.pagado) {
+      return ConfirmacionPage(
+        onNav: _onNav,
+        codigoPedido: e.codigo,
+        numeroComprobante: e.comprobante ?? '—',
+        referenciaPago: e.referencia ?? '—',
+        totalPagado: formatoPesos(e.total),
+        unidadesCarrito: _unidades,
+        onSeguir: _irInicio,
+        // Sin cuenta no hay dónde ver el pedido; solo se ofrece con sesión.
+        onVerPedido: _sesion == null ? null : () => _onNav(DestinoNav.cuenta),
+        onLogo: _irInicio,
+        onCarrito: _irCarrito,
+      );
+    }
+    return PagoRetornoPage(
+      estado: e,
+      verificando: _retornoVerificando,
+      sinConexion: _retornoSinConexion,
+      reintentando: _retornoReintentando,
+      unidadesCarrito: _unidades,
+      onReintentarPago: _reintentarPago,
+      onRevisar: _revisarPagoOtraVez,
+      onSeguir: _irInicio,
+      onLogo: _irInicio,
+      onCarrito: _irCarrito,
+      onNav: _onNav,
     );
   }
 

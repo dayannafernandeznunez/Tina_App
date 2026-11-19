@@ -8,6 +8,7 @@ import 'data/pedidos.dart';
 import 'data/sesion.dart';
 import 'screens/tina_screen.dart';
 import 'theme/tina_tema.dart';
+import 'utils/abrir_url.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -21,9 +22,9 @@ Future<void> main() async {
       sesiones: SesionSupabase(),
       pedidos: PedidosSupabase(),
       admin: AdministradoraSupabase(),
-      // El pago en línea con Wompi todavía no está conectado (por eso
-      // `pagoEnLinea` queda apagado): por ahora solo se puede comprar con
-      // contraentrega, en Cali.
+      // El pago en línea pasa por las funciones del servidor de Supabase
+      // (iniciar-pago y wompi-eventos); ver supabase/LEEME.md para activarlas.
+      pagoEnLinea: true,
     ),
   );
 }
@@ -42,7 +43,19 @@ class TinaApp extends StatelessWidget {
     this.admin,
     this.pagoEnLinea = false,
     this.selectorFotos = const SelectorFotosDispositivo(),
+    this.abrirUrl = abrirEnLaMismaPestana,
+    this.urlInicial,
+    this.pausaSondeo = const Duration(seconds: 2),
   });
+
+  /// Cómo se abre la página de pago de Wompi.
+  final AbrirUrl abrirUrl;
+
+  /// La dirección con la que se abrió la app (en las pruebas se pone a mano).
+  final Uri? urlInicial;
+
+  /// Espera entre una consulta y otra del estado del pago.
+  final Duration pausaSondeo;
 
   final CatalogoRepositorio? catalogo;
 
@@ -74,6 +87,9 @@ class TinaApp extends StatelessWidget {
         pagoEnLinea: pagoEnLinea,
         admin: admin,
         selectorFotos: selectorFotos,
+        abrirUrl: abrirUrl,
+        urlInicial: urlInicial,
+        pausaSondeo: pausaSondeo,
       ),
     );
   }

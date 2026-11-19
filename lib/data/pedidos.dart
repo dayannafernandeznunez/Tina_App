@@ -61,6 +61,7 @@ class PedidoCreado {
     required this.descuento,
     required this.costoEnvio,
     required this.total,
+    this.token,
   });
 
   factory PedidoCreado.desdeMapa(Map<String, dynamic> fila) => PedidoCreado(
@@ -70,6 +71,7 @@ class PedidoCreado {
     descuento: fila['descuento'] as int,
     costoEnvio: fila['costo_envio'] as int,
     total: fila['total'] as int,
+    token: fila['token'] as String?,
   );
 
   final int idPedido;
@@ -78,6 +80,62 @@ class PedidoCreado {
   final int descuento;
   final int costoEnvio;
   final int total;
+
+  /// La llave de este pedido: con ella, aunque no tenga cuenta, la compradora
+  /// puede pagarlo, ver su estado o cancelarlo.
+  final String? token;
+}
+
+/// Cómo va un pedido y su pago, según la base de datos. Es lo que se muestra
+/// cuando la clienta vuelve de la página de pago de Wompi.
+class EstadoPagoPedido {
+  const EstadoPagoPedido({
+    required this.idPedido,
+    required this.codigo,
+    required this.estado,
+    required this.pagoEstado,
+    required this.total,
+    this.referencia,
+    this.comprobante,
+  });
+
+  factory EstadoPagoPedido.desdeMapa(Map<String, dynamic> fila) =>
+      EstadoPagoPedido(
+        idPedido: fila['id_pedido'] as int,
+        codigo: fila['codigo'] as String,
+        estado: fila['estado'] as String,
+        pagoEstado: fila['pago_estado'] as String,
+        total: fila['total'] as int,
+        referencia: fila['referencia'] as String?,
+        comprobante: fila['comprobante'] as String?,
+      );
+
+  final int idPedido;
+  final String codigo;
+
+  /// El estado del pedido: pendiente, pagado, cancelado...
+  final String estado;
+
+  /// El estado del pago: pendiente, aprobado o rechazado.
+  final String pagoEstado;
+  final int total;
+  final String? referencia;
+  final String? comprobante;
+
+  bool get cancelado => estado == 'cancelado';
+
+  /// El pago se aprobó y el pedido sigue en pie.
+  bool get pagado => pagoEstado == 'aprobado' && !cancelado;
+
+  /// Llegó un pago, pero el pedido ya estaba cancelado: hay que devolver el
+  /// dinero, y eso lo coordina la vendedora.
+  bool get pagoEnPedidoCancelado => pagoEstado == 'aprobado' && cancelado;
+
+  /// El banco o la tarjeta no lo aprobó; se puede intentar de nuevo.
+  bool get rechazado => pagoEstado == 'rechazado' && estado == 'pendiente';
+
+  /// Todavía no hay respuesta de Wompi.
+  bool get esperando => pagoEstado == 'pendiente' && estado == 'pendiente';
 }
 
 /// Los pedidos y todo lo que cuelga de ellos, listos para armar la pantalla.
@@ -121,6 +179,16 @@ abstract class PedidosRepositorio {
 
   /// Solo la administradora. Al cancelar, el stock vuelve a las variantes.
   Future<void> cambiarEstado(int idPedido, EstadoPedido estado);
+
+  /// Prepara el pago con Wompi y devuelve la dirección de su página de pago, ya
+  /// firmada. Lanza [ErrorPedido] si no se pudo.
+  Future<String> iniciarPagoWompi(int idPedido, String token);
+
+  /// Cómo va el pedido y su pago. Sirve con o sin cuenta, con el [token].
+  Future<EstadoPagoPedido> consultarEstado(int idPedido, String token);
+
+  /// Cancela un pedido propio que sigue pendiente (devuelve el stock).
+  Future<void> cancelarPedidoPropio(int idPedido, String token);
 }
 
 /// Hace todo lo anterior con Supabase.
@@ -260,6 +328,66 @@ class PedidosSupabase implements PedidosRepositorio {
       throw const ErrorPedido(
         'No pudimos guardar el cambio. Inténtalo de nuevo.',
       );
+    }
+  }
+
+  @override
+  Future<String> iniciarPagoWompi(int idPedido, String token) async {
+    try {
+      final respuesta = await _c.functions.invoke(
+        'iniciar-pago',
+        body: {'id_pedido': idPedido, 'token': token},
+      );
+      final datos = respuesta.data;
+      final url = datos is Map ? datos['url'] : null;
+      if (url is! String || url.isEmpty) {
+        throw const ErrorPedido('No pudimos abrir la página de pago.');
+      }
+      return url;
+    } on FunctionException catch (e) {
+      final detalle = e.details;
+      throw ErrorPedido(
+        detalle is Map && detalle['error'] is String
+            ? detalle['error'] as String
+            : 'No pudimos abrir la página de pago. Inténtalo de nuevo.',
+      );
+    } on ErrorPedido {
+      rethrow;
+    } catch (_) {
+      throw const ErrorPedido(
+        'No pudimos conectar. Revisa tu internet e inténtalo de nuevo.',
+      );
+    }
+  }
+
+  @override
+  Future<EstadoPagoPedido> consultarEstado(int idPedido, String token) async {
+    try {
+      final respuesta = await _c.rpc(
+        'ver_estado_pedido',
+        params: {'p_id': idPedido, 'p_token': token},
+      );
+      return EstadoPagoPedido.desdeMapa(respuesta as Map<String, dynamic>);
+    } on PostgrestException catch (e) {
+      throw ErrorPedido(e.message);
+    } catch (_) {
+      throw const ErrorPedido(
+        'No pudimos conectar. Revisa tu internet e inténtalo de nuevo.',
+      );
+    }
+  }
+
+  @override
+  Future<void> cancelarPedidoPropio(int idPedido, String token) async {
+    try {
+      await _c.rpc(
+        'cancelar_pedido_propio',
+        params: {'p_id': idPedido, 'p_token': token},
+      );
+    } on PostgrestException catch (e) {
+      throw ErrorPedido(e.message);
+    } catch (_) {
+      throw const ErrorPedido('No pudimos cancelar el pedido.');
     }
   }
 }
