@@ -32,6 +32,7 @@ for (const f of [
   'migrations/20261118000004_pedidos_reales.sql',
   'migrations/20261118000005_pago_wompi.sql',
   'migrations/20261119000006_fotos_por_color.sql',
+  'migrations/20261119000007_aviso_whatsapp.sql',
 ]) {
   try {
     await db.exec(leer(f));
@@ -47,7 +48,7 @@ await db.exec(`
   grant all on all sequences in schema public to anon, authenticated;
   grant select on auth.users to authenticated;
 `);
-console.log('Los 7 scripts corren sin errores.\n');
+console.log('Los 8 scripts corren sin errores.\n');
 
 let ok = 0, mal = 0;
 const igual = (nombre, real, esperado) => {
@@ -289,6 +290,38 @@ await db.exec('set role anon');
 igual('una visitante ve las fotos con su color', (await q(`select color from imagen_producto where id_producto = 1 order by orden`)).map((f) => f.color), [null, 'Blanco']);
 await falla('una visitante no puede subir fotos', `insert into imagen_producto (id_producto, url, ruta, orden, color) values (1, 'https://x/z.jpg', 'p1/z.jpg', 3, 'Rojo')`, [], '');
 await db.exec('reset role');
+
+// ---- Aviso por WhatsApp: cuándo toca avisar y que no se repita.
+console.log('\n--- Aviso por WhatsApp');
+const reclamar = (id, tok = null) => COMO_SERVICIO(() => uno('select public.reclamar_aviso_pedido($1, $2::uuid) as a', [id, tok]).then((x) => x.a));
+
+r = await pedir([{ id_variante: 6, cantidad: 2 }], 'contraentrega', envio('Cali', 'Valle del Cauca'));
+const idCE = r.id_pedido, tokCE = r.token;
+await db.exec('set role anon');
+await falla('una visitante no puede pedir avisos directamente', 'select public.reclamar_aviso_pedido($1, $2::uuid)', [idCE, tokCE], 'permission denied');
+await db.exec('reset role');
+await COMO_SERVICIO(() => falla('con la llave de otro pedido no se encuentra', "select public.reclamar_aviso_pedido($1, '00000000-0000-0000-0000-000000000000'::uuid)", [idCE], 'No encontramos ese pedido'));
+
+let av = await reclamar(idCE, tokCE);
+igual('una contraentrega se avisa apenas se crea', [av.codigo, av.metodo_pago, av.estado, av.cliente], [`TINA-${String(idCE).padStart(4, '0')}`, 'contraentrega', 'pendiente', 'Isabella']);
+igual('el aviso trae la dirección y el total', [av.ciudad, av.direccion, av.costo_envio, av.total === r.total], ['Cali', 'Calle 1 #2-3', 0, true]);
+igual('y los artículos con color, talla y cantidad', [av.lineas.length, av.lineas[0].cantidad, typeof av.lineas[0].nombre, typeof av.lineas[0].color], [1, 2, 'string', 'string']);
+igual('la segunda vez no se avisa (ya se avisó)', await reclamar(idCE, tokCE), null);
+await COMO_SERVICIO(() => db.query('select public.liberar_aviso_pedido($1)', [idCE]));
+igual('si el envío falló, liberado se puede avisar otra vez', (await reclamar(idCE)).codigo, av.codigo);
+
+r = await pedir([{ id_variante: 11, cantidad: 1 }]);
+const idPW = r.id_pedido;
+igual('un pedido de Wompi sin pagar no se avisa', await reclamar(idPW), null);
+await COMO_SERVICIO(() => db.query("select public.registrar_resultado_pago($1, 'APPROVED', $2, 'tx-aviso')", [ref(idPW, 1), r.total * 100]));
+av = await reclamar(idPW);
+igual('al aprobarse el pago, sí se avisa (sin llave: lo pide el servidor)', [av.codigo, av.metodo_pago, av.estado], [`TINA-${String(idPW).padStart(4, '0')}`, 'wompi', 'pagado']);
+igual('y solo una vez', await reclamar(idPW), null);
+
+r = await pedir([{ id_variante: 6, cantidad: 1 }], 'contraentrega', envio('Cali', 'Valle del Cauca'));
+await db.query('update pedido set estado_actual = $2 where id_pedido = $1', [r.id_pedido, 'cancelado']);
+igual('un pedido cancelado no se avisa', await reclamar(r.id_pedido), null);
+
 
 console.log(`\n${ok} bien, ${mal} mal`);
 process.exit(mal ? 1 : 0);

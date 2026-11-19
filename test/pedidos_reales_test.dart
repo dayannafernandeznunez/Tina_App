@@ -37,6 +37,9 @@ class _PedidosFalsos implements PedidosRepositorio {
   final List<(int, String)> pagosIniciados = [];
   final List<(int, String)> cancelados = [];
 
+  /// Los avisos por WhatsApp que la tienda pidió: (pedido, llave).
+  final List<(int, String)> avisos = [];
+
   /// Lo que responde cada consulta de estado; la última se repite. Si la lista
   /// está vacía, la consulta falla como si no hubiera internet.
   List<EstadoPagoPedido> estados = [];
@@ -89,6 +92,11 @@ class _PedidosFalsos implements PedidosRepositorio {
   @override
   Future<void> cancelarPedidoPropio(int idPedido, String token) async {
     cancelados.add((idPedido, token));
+  }
+
+  @override
+  Future<void> avisarPedido(int idPedido, String token) async {
+    avisos.add((idPedido, token));
   }
 
   @override
@@ -384,6 +392,9 @@ void main() {
 
         // El stock cambió en la base de datos: se vuelve a leer el catálogo.
         expect(catalogo.cargas, greaterThanOrEqualTo(2));
+
+        // Y se le avisó a la vendedora por WhatsApp, con la llave del pedido.
+        expect(pedidos.avisos, [(31, _PedidosFalsos.token)]);
       },
     );
 
@@ -465,6 +476,9 @@ void main() {
       expect(pedidos.pagosIniciados, [(31, _PedidosFalsos.token)]);
       expect(urls, ['https://checkout.wompi.co/p/?pedido=31']);
       expect(pedidos.cancelados, isEmpty);
+      // El aviso de un pago con Wompi lo manda el servidor cuando se aprueba,
+      // no la tienda: todavía no está pagado.
+      expect(pedidos.avisos, isEmpty);
     });
 
     testWidgets(

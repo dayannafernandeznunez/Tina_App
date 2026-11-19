@@ -15,6 +15,7 @@ de tu proyecto en Supabase.
 
 | 7 | `migrations/20261118000005_pago_wompi.sql` | Pago en línea: cada pedido tiene su llave (`token_publico`), los intentos de pago y las funciones que usan las funciones del servidor para iniciar el pago, recibir el aviso de Wompi y consultar o cancelar un pedido. |
 | 8 | `migrations/20261119000006_fotos_por_color.sql` | Cada foto de un producto puede ser de un color: al elegir ese color en la tienda se ven sus fotos. |
+| 9 | `migrations/20261119000007_aviso_whatsapp.sql` | Aviso por WhatsApp: marca cada pedido como avisado (para no repetirlo) y arma lo que lleva el mensaje. |
 
 Los scripts nuevos se agregan al final: si ya ejecutaste los anteriores, solo
 ejecuta los que falten, en orden. La prueba de que funcionan está en
@@ -99,6 +100,45 @@ tienda y pon la *URL de Eventos* también en el ambiente de producción de Wompi
   `wompi-eventos` (un aviso con firma mala responde 401).
 - Un pedido que se queda sin pagar **no se cancela solo**: tiene el stock
   apartado hasta que la vendedora lo cancele desde el panel.
+
+## Aviso por WhatsApp de los pedidos
+
+Cada pedido nuevo te llega por WhatsApp con la clienta (y un enlace para
+escribirle), los artículos, el total, la dirección y, si es contraentrega, el
+recordatorio de coordinar la transferencia:
+
+- **Contraentrega:** el aviso sale apenas la clienta hace el pedido.
+- **Pago con Wompi:** sale cuando Wompi confirma el pago (no antes).
+- Un pedido cancelado no se avisa, y cada pedido se avisa **una sola vez**.
+
+Lo manda la función `avisar-pedido` por **CallMeBot**, un servicio gratis que
+escribe a tu propio WhatsApp (solo sirve para recibir los avisos tú; es de uso
+personal y no oficial, así que si algún día deja de funcionar, la tienda sigue
+igual y los pedidos se ven en el panel).
+
+### Activarlo
+
+1. **Ejecuta el script 9** en el *SQL Editor*.
+2. **Activa CallMeBot** (una sola vez): guarda el contacto **+34 644 44 21 48**
+   en tu celular, escríbele por WhatsApp exactamente `I allow callmebot to send me
+   messages` y espera su respuesta: trae tu **clave** (si no llega en 2 minutos,
+   se reintenta a las 24 horas).
+3. **Guarda dos secretos** en *Edge Functions* → *Secrets*:
+
+   | Nombre | Valor |
+   |---|---|
+   | `VENDEDORA_TELEFONO` | Tu número con el código del país, por ejemplo `+573001234567`. |
+   | `CALLMEBOT_APIKEY` | La clave que te respondió CallMeBot. |
+
+4. **Crea la función `avisar-pedido`** igual que las otras (*Via Editor*, con el
+   contenido de `functions/avisar-pedido/index.ts` y *Verify JWT* apagado).
+5. **Vuelve a desplegar `wompi-eventos`** con el `index.ts` nuevo: ahora avisa
+   cuando se aprueba un pago.
+6. **Prueba:** haz una compra con contraentrega en Cali. En unos segundos debe
+   llegarte el mensaje.
+
+Si faltan los secretos no pasa nada malo: la tienda funciona y simplemente no se
+avisa. Si no llega el mensaje, mira los *Logs* de `avisar-pedido`.
 
 ## Qué nunca se sube a GitHub
 

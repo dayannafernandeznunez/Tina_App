@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/models.dart';
@@ -189,6 +190,12 @@ abstract class PedidosRepositorio {
 
   /// Cancela un pedido propio que sigue pendiente (devuelve el stock).
   Future<void> cancelarPedidoPropio(int idPedido, String token);
+
+  /// Le avisa por WhatsApp a la vendedora de un pedido nuevo (las
+  /// contraentregas; los pagos con Wompi los avisa el servidor al aprobarse).
+  /// Nunca falla: si no se puede avisar, la compra no se ve afectada y la
+  /// vendedora igual ve el pedido en su panel.
+  Future<void> avisarPedido(int idPedido, String token);
 }
 
 /// Hace todo lo anterior con Supabase.
@@ -388,6 +395,19 @@ class PedidosSupabase implements PedidosRepositorio {
       throw ErrorPedido(e.message);
     } catch (_) {
       throw const ErrorPedido('No pudimos cancelar el pedido.');
+    }
+  }
+
+  @override
+  Future<void> avisarPedido(int idPedido, String token) async {
+    try {
+      await _c.functions.invoke(
+        'avisar-pedido',
+        body: {'id_pedido': idPedido, 'token': token},
+      );
+    } catch (error) {
+      // El aviso es un extra: no debe estorbar la compra.
+      debugPrint('No se pudo avisar del pedido $idPedido: $error');
     }
   }
 }

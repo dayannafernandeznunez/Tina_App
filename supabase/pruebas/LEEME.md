@@ -35,6 +35,14 @@ nuevo (lee los archivos `.ts` directamente):
 node prueba_wompi.mjs
 ```
 
+`prueba_aviso.mjs` prueba la función `avisar-pedido` (cómo se escribe el mensaje,
+quién puede pedir un aviso, qué pasa si falla el envío) y que un pago aprobado
+de Wompi dispare el aviso:
+
+```bash
+node prueba_aviso.mjs
+```
+
 Nota: el ejemplo de aviso de la documentación de Wompi muestra el resultado
 `3476DDA5…`, pero ese número no sale de los valores que la propia documentación
 usa (con ellos, SHA-256 da `5A18EC5E…`). Por eso la prueba compara con el cálculo

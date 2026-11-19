@@ -22,6 +22,11 @@ export type Dependencias = {
     args: Record<string, unknown>,
   ) => Promise<{ datos: any; error: { message: string; code?: string } | null }>;
   secretoEventos: string;
+  /**
+   * Avisa por WhatsApp a la vendedora de un pedido que se acaba de pagar. Es un
+   * extra: si falla, el pago igual queda registrado.
+   */
+  avisar?: (idPedido: number) => Promise<void>;
 };
 
 export type Respuesta = { estado: number; cuerpo: Record<string, unknown> };
@@ -120,6 +125,16 @@ export async function recibirEvento(
     console.error('Error al aplicar el aviso de Wompi:', error);
     return { estado: 500, cuerpo: { error: 'Error temporal, reintenta.' } };
   }
+
+  // Pago aprobado: se le avisa a la vendedora. Aunque el aviso falle, se
+  // responde 200 para que Wompi no vuelva a mandar el mismo pago.
+  if (datos?.resultado === 'aprobado' && deps.avisar) {
+    try {
+      await deps.avisar(Number(datos.id_pedido));
+    } catch (e) {
+      console.error('No se pudo avisar del pedido pagado', datos.id_pedido, e);
+    }
+  }
   return { estado: 200, cuerpo: { ok: true, resultado: datos?.resultado } };
 }
 
@@ -130,6 +145,18 @@ if (typeof Deno !== 'undefined') {
 
   const deps: Dependencias = {
     secretoEventos: Deno.env.get('WOMPI_EVENTS_SECRET') ?? '',
+    // Llama a la función avisar-pedido identificándose con la llave de servicio.
+    avisar: async (idPedido) => {
+      const r = await fetch(`${urlSupabase}/functions/v1/avisar-pedido`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${llaveServicio}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ id_pedido: idPedido }),
+      });
+      if (!r.ok) throw new Error(`avisar-pedido respondió ${r.status}`);
+    },
     rpc: async (nombre, args) => {
       const r = await fetch(`${urlSupabase}/rest/v1/rpc/${nombre}`, {
         method: 'POST',

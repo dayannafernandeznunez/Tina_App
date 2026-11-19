@@ -1,3 +1,5 @@
+import 'dart:async' show unawaited;
+
 import 'package:flutter/material.dart';
 
 import '../components/components.dart';
@@ -1293,6 +1295,12 @@ class _TinaScreenState extends State<TinaScreen> {
         _mostrarErrores = false;
         _pila = [Ruta.inicio, Ruta.confirmacion];
       });
+
+      // La contraentrega queda lista al crearse: se le avisa a la vendedora por
+      // WhatsApp. (Los pagos con Wompi los avisa el servidor al aprobarse.) No
+      // se espera la respuesta y nunca estorba la compra.
+      final llave = creado.token;
+      if (llave != null) unawaited(repo.avisarPedido(creado.idPedido, llave));
 
       // El stock cambió en la base de datos: se vuelve a leer.
       _cargarCatalogo();
