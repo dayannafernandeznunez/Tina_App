@@ -1,4 +1,20 @@
+import '../data/administradora.dart';
 import '../models/models.dart';
+
+/// Una foto que la administradora eligió y todavía no se sube: se sube cuando
+/// guarda el producto. [color] es el color al que pertenece; `null` es una
+/// foto general (la portada).
+class FotoNueva {
+  const FotoNueva({required this.clave, required this.foto, this.color});
+
+  /// Identifica la foto en la pantalla, igual que `BorradorVariante.clave`.
+  final String clave;
+  final FotoElegida foto;
+  final String? color;
+
+  FotoNueva conColor(String? color) =>
+      FotoNueva(clave: clave, foto: foto, color: color);
+}
 
 /// Una variante (color y talla con su stock) mientras se edita. [clave] es un
 /// identificador solo de la pantalla: sirve para distinguir filas aunque
@@ -51,6 +67,9 @@ class BorradorProducto {
     this.activo = true,
     this.variantes = const [],
     this.idsVariantesOriginales = const [],
+    this.fotosExistentes = const [],
+    this.fotosNuevas = const [],
+    this.idsFotosABorrar = const [],
   });
 
   /// Un producto vacío, con una variante en blanco para empezar.
@@ -65,8 +84,9 @@ class BorradorProducto {
   /// El formulario de un producto que ya existe.
   factory BorradorProducto.desde(
     Producto p,
-    List<VarianteProducto> variantes,
-  ) => BorradorProducto(
+    List<VarianteProducto> variantes, {
+    List<ImagenProducto> fotos = const [],
+  }) => BorradorProducto(
     idProducto: p.idProducto,
     nombre: p.nombre,
     descripcion: p.descripcion,
@@ -85,6 +105,7 @@ class BorradorProducto {
         ),
     ],
     idsVariantesOriginales: [for (final v in variantes) v.idVariante],
+    fotosExistentes: [...fotos]..sort((a, b) => a.orden.compareTo(b.orden)),
   );
 
   /// 0 mientras el producto es nuevo.
@@ -102,6 +123,15 @@ class BorradorProducto {
   /// Variantes que tenía al abrirlo: las que ya no estén se borran al guardar.
   final List<int> idsVariantesOriginales;
 
+  /// Las fotos que el producto ya tiene, de cualquier color.
+  final List<ImagenProducto> fotosExistentes;
+
+  /// Fotos elegidas que se suben al guardar.
+  final List<FotoNueva> fotosNuevas;
+
+  /// Fotos que ya tenía y se quitaron: se borran al guardar.
+  final List<int> idsFotosABorrar;
+
   bool get esNuevo => idProducto == 0;
 
   BorradorProducto copyWith({
@@ -112,6 +142,8 @@ class BorradorProducto {
     int? idCategoria,
     bool? activo,
     List<BorradorVariante>? variantes,
+    List<FotoNueva>? fotosNuevas,
+    List<int>? idsFotosABorrar,
   }) => BorradorProducto(
     idProducto: idProducto,
     nombre: nombre ?? this.nombre,
@@ -122,6 +154,9 @@ class BorradorProducto {
     activo: activo ?? this.activo,
     variantes: variantes ?? this.variantes,
     idsVariantesOriginales: idsVariantesOriginales,
+    fotosExistentes: fotosExistentes,
+    fotosNuevas: fotosNuevas ?? this.fotosNuevas,
+    idsFotosABorrar: idsFotosABorrar ?? this.idsFotosABorrar,
   );
 
   BorradorProducto conVariante(
@@ -161,7 +196,86 @@ class BorradorProducto {
       for (final id in idsVariantes.values)
         if (!idsVariantesOriginales.contains(id)) id,
     ],
+    fotosExistentes: fotosExistentes,
+    fotosNuevas: fotosNuevas,
+    idsFotosABorrar: idsFotosABorrar,
   );
+
+  /// Lo mismo, pero sin las fotos que un guardado cortado a la mitad ya subió
+  /// ([clavesSubidas]) o borró ([idsBorradas]): al reintentar no se repiten.
+  BorradorProducto sinFotosHechas({
+    Set<String> clavesSubidas = const {},
+    Set<int> idsBorradas = const {},
+  }) => BorradorProducto(
+    idProducto: idProducto,
+    nombre: nombre,
+    descripcion: descripcion,
+    tecnica: tecnica,
+    precio: precio,
+    idCategoria: idCategoria,
+    activo: activo,
+    variantes: variantes,
+    idsVariantesOriginales: idsVariantesOriginales,
+    fotosExistentes: [
+      for (final f in fotosExistentes)
+        if (!idsBorradas.contains(f.idImagen)) f,
+    ],
+    fotosNuevas: [
+      for (final f in fotosNuevas)
+        if (!clavesSubidas.contains(f.clave)) f,
+    ],
+    idsFotosABorrar: [
+      for (final id in idsFotosABorrar)
+        if (!idsBorradas.contains(id)) id,
+    ],
+  );
+
+  /// Los colores distintos de la lista, en el orden en que aparecen. Los
+  /// vacíos no cuentan.
+  List<String> get colores {
+    final vistos = <String>{};
+    return [
+      for (final v in variantes)
+        if (v.color.trim().isNotEmpty && vistos.add(claveColor(v.color)))
+          v.color.trim(),
+    ];
+  }
+
+  /// Fotos que ya tiene y no se van a borrar.
+  List<ImagenProducto> get fotosActuales => [
+    for (final f in fotosExistentes)
+      if (!idsFotosABorrar.contains(f.idImagen)) f,
+  ];
+
+  bool _esDeColor(String? colorFoto, String? color) => color == null
+      ? colorFoto == null
+      : colorFoto != null && claveColor(colorFoto) == claveColor(color);
+
+  /// Las fotos que ya tiene de [color] (`null` = generales).
+  List<ImagenProducto> fotosDe(String? color) => [
+    for (final f in fotosActuales)
+      if (_esDeColor(f.color, color)) f,
+  ];
+
+  /// Las fotos elegidas para subir de [color] (`null` = generales).
+  List<FotoNueva> nuevasDe(String? color) => [
+    for (final f in fotosNuevas)
+      if (_esDeColor(f.color, color)) f,
+  ];
+
+  /// Fotos de un color que ya no está en la lista de colores (por ejemplo, si
+  /// se le cambió el nombre): siguen en el producto y se pueden quitar.
+  List<ImagenProducto> get fotosHuerfanas {
+    final claves = {for (final c in colores) claveColor(c)};
+    return [
+      for (final f in fotosActuales)
+        if (f.color != null && !claves.contains(claveColor(f.color!))) f,
+    ];
+  }
+
+  /// Si tiene al menos una foto general (la portada) ya guardada o elegida.
+  bool get tienePortada =>
+      fotosDe(null).isNotEmpty || nuevasDe(null).isNotEmpty;
 
   /// El precio en pesos enteros; acepta "55000", "55.000" o "$55.000".
   /// `null` si no hay un número válido.
@@ -173,8 +287,8 @@ class BorradorProducto {
 
   /// Lo que falta o está mal, por campo. Vacío si se puede guardar.
   ///
-  /// Las claves son `nombre`, `precio`, `categoria`, `variantes` y, para cada
-  /// variante, `color-<clave>`.
+  /// Las claves son `nombre`, `precio`, `categoria`, `variantes`, `foto` (un
+  /// producto nuevo necesita su portada) y, para cada variante, `color-<clave>`.
   Map<String, String> errores() {
     final e = <String, String>{};
     if (nombre.trim().isEmpty) e['nombre'] = 'Escribe el nombre.';
@@ -185,6 +299,9 @@ class BorradorProducto {
     if (idCategoria == 0) e['categoria'] = 'Elige una categoría.';
     if (variantes.isEmpty) {
       e['variantes'] = 'Agrega al menos un color o talla.';
+    }
+    if (esNuevo && !tienePortada) {
+      e['foto'] = 'Sube la foto de portada del producto.';
     }
 
     final vistas = <String>{};
@@ -213,4 +330,15 @@ class BorradorProducto {
   );
 
   int get stockTotal => variantes.fold(0, (s, v) => s + v.stock);
+
+  /// El stock de cada color, sumando sus tallas.
+  Map<String, int> get stockPorColor {
+    final r = <String, int>{};
+    for (final c in colores) {
+      r[c] = variantes
+          .where((v) => claveColor(v.color) == claveColor(c))
+          .fold(0, (s, v) => s + v.stock);
+    }
+    return r;
+  }
 }

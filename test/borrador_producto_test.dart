@@ -1,16 +1,27 @@
+import 'dart:typed_data';
+
 import 'package:flutter_test/flutter_test.dart';
+import 'package:tina_app/data/administradora.dart';
 import 'package:tina_app/logic/borrador_producto.dart';
 import 'package:tina_app/models/models.dart';
 import 'package:tina_app/theme/colores_producto.dart';
 
-BorradorProducto _valido() => const BorradorProducto(
+FotoNueva _foto(String clave, [String? color]) => FotoNueva(
+  clave: clave,
+  foto: FotoElegida(bytes: Uint8List.fromList([1, 2, 3]), nombre: '$clave.jpg'),
+  color: color,
+);
+
+/// Un producto nuevo completo: con su portada, que es lo mínimo para crearlo.
+BorradorProducto _valido() => BorradorProducto(
   nombre: 'Collar nuevo',
   precio: '55.000',
   idCategoria: 1,
-  variantes: [
+  variantes: const [
     BorradorVariante(clave: 'a', color: 'Naranja', stock: 4),
     BorradorVariante(clave: 'b', color: 'Blanco', talla: 'M', stock: 2),
   ],
+  fotosNuevas: [_foto('portada')],
 );
 
 void main() {
@@ -18,6 +29,148 @@ void main() {
     test('un producto completo no tiene errores', () {
       expect(_valido().errores(), isEmpty);
     });
+
+    test('un producto nuevo necesita su foto de portada', () {
+      final sinFoto = _valido().copyWith(fotosNuevas: []);
+
+      expect(sinFoto.errores(), contains('foto'));
+      // Una foto de un color no reemplaza la portada.
+      expect(
+        sinFoto.copyWith(fotosNuevas: [_foto('f', 'Naranja')]).errores(),
+        contains('foto'),
+      );
+    });
+
+    test('un producto que ya existe no necesita portada para guardarse', () {
+      const producto = Producto(
+        idProducto: 3,
+        idCategoria: 2,
+        nombre: 'Aretes',
+        descripcion: '',
+        tecnica: '',
+        precio: 18000,
+      );
+      final borrador = BorradorProducto.desde(producto, const [
+        VarianteProducto(
+          idVariante: 5,
+          idProducto: 3,
+          color: 'Nude',
+          talla: 'Única',
+          stock: 10,
+        ),
+      ]);
+
+      expect(borrador.errores(), isEmpty);
+    });
+
+    test('separa las fotos por color sin distinguir mayúsculas', () {
+      final b = _valido().copyWith(
+        fotosNuevas: [
+          _foto('p'),
+          _foto('n1', 'Naranja'),
+          _foto('n2', ' naranja '),
+          _foto('b1', 'Blanco'),
+        ],
+      );
+
+      expect(b.nuevasDe(null).map((f) => f.clave), ['p']);
+      expect(b.nuevasDe('NARANJA').map((f) => f.clave), ['n1', 'n2']);
+      expect(b.nuevasDe('Blanco').map((f) => f.clave), ['b1']);
+      expect(b.colores, ['Naranja', 'Blanco']);
+    });
+
+    test('muestra cuánto stock tiene cada color', () {
+      final b = _valido().conVariante(
+        'b',
+        (v) => v.copyWith(color: 'naranja', talla: 'L', stock: 3),
+      );
+
+      // Las dos filas son el mismo color con otra talla: se suman.
+      expect(b.stockPorColor, {'Naranja': 7});
+      expect(b.stockTotal, 7);
+    });
+
+    test('quitar una foto que ya tenía la marca para borrarla al guardar', () {
+      const producto = Producto(
+        idProducto: 3,
+        idCategoria: 2,
+        nombre: 'Aretes',
+        descripcion: '',
+        tecnica: '',
+        precio: 18000,
+      );
+      const fotos = [
+        ImagenProducto(idImagen: 1, idProducto: 3, url: 'a', orden: 1),
+        ImagenProducto(
+          idImagen: 2,
+          idProducto: 3,
+          url: 'b',
+          orden: 2,
+          color: 'Nude',
+        ),
+      ];
+      final b = BorradorProducto.desde(producto, const [
+        VarianteProducto(
+          idVariante: 5,
+          idProducto: 3,
+          color: 'Nude',
+          talla: 'Única',
+          stock: 1,
+        ),
+      ], fotos: fotos);
+
+      expect(b.fotosDe(null).map((f) => f.idImagen), [1]);
+      expect(b.fotosDe('nude').map((f) => f.idImagen), [2]);
+
+      final sinNude = b.copyWith(idsFotosABorrar: [2]);
+      expect(sinNude.fotosDe('Nude'), isEmpty);
+      expect(sinNude.fotosActuales.map((f) => f.idImagen), [1]);
+    });
+
+    test('las fotos de un color que ya no está se muestran aparte', () {
+      const producto = Producto(
+        idProducto: 3,
+        idCategoria: 2,
+        nombre: 'Aretes',
+        descripcion: '',
+        tecnica: '',
+        precio: 18000,
+      );
+      final b = BorradorProducto.desde(
+        producto,
+        const [
+          VarianteProducto(
+            idVariante: 5,
+            idProducto: 3,
+            color: 'Nude',
+            talla: 'Única',
+            stock: 1,
+          ),
+        ],
+        fotos: const [
+          ImagenProducto(
+            idImagen: 2,
+            idProducto: 3,
+            url: 'b',
+            orden: 2,
+            color: 'Verde',
+          ),
+        ],
+      );
+
+      expect(b.fotosHuerfanas.map((f) => f.idImagen), [2]);
+    });
+
+    test(
+      'al reintentar un guardado cortado no se repiten las fotos hechas',
+      () {
+        final b = _valido()
+            .copyWith(fotosNuevas: [_foto('p'), _foto('n', 'Naranja')])
+            .sinFotosHechas(clavesSubidas: {'p'});
+
+        expect(b.fotosNuevas.map((f) => f.clave), ['n']);
+      },
+    );
 
     test('el precio acepta puntos, signo de pesos y espacios', () {
       for (final texto in ['55000', '55.000', r'$55.000', ' 55 000 ']) {

@@ -7,14 +7,30 @@ class ProductoVista {
     required this.categoria,
     required this.variantes,
     this.fotos = const [],
+    this.fotosPorColor = const {},
   });
 
   final Producto producto;
   final String categoria;
   final List<VarianteProducto> variantes;
 
-  /// Direcciones de las fotos, en el orden que eligió la administradora.
+  /// Direcciones de las fotos generales (la portada), en el orden que eligió la
+  /// administradora. Si el producto solo tiene fotos de colores, son esas.
   final List<String> fotos;
+
+  /// Fotos de cada color, por [claveColor] del color.
+  final Map<String, List<String>> fotosPorColor;
+
+  /// Las fotos que se ven al elegir [color]: las de ese color, y si no tiene,
+  /// las generales.
+  List<String> fotosPara(String color) {
+    final propias = fotosPorColor[claveColor(color)];
+    return propias == null || propias.isEmpty ? fotos : propias;
+  }
+
+  /// Si [color] tiene fotos propias.
+  bool tieneFotosDe(String color) =>
+      (fotosPorColor[claveColor(color)] ?? const []).isNotEmpty;
 
   /// Colores distintos, en el orden en que aparecen las variantes.
   List<String> get colores => [
@@ -34,6 +50,12 @@ class ProductoVista {
   }
 
   int stockDe(String color, String talla) => variante(color, talla)?.stock ?? 0;
+
+  /// Lo que queda de cada color, sumando sus tallas, en el orden de [colores].
+  Map<String, int> get stockPorColor => {
+    for (final c in colores)
+      c: variantes.where((v) => v.color == c).fold(0, (s, v) => s + v.stock),
+  };
 }
 
 class LineaPedido {

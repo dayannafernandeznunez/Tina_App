@@ -14,6 +14,7 @@ de tu proyecto en Supabase.
 | 6 | `migrations/20261118000004_pedidos_reales.sql` | Pedidos reales: crea el pedido descontando el stock, con descuentos y el envío de $5.000; contraentrega en Cali; cambios de estado; cada clienta ve sus pedidos. |
 
 | 7 | `migrations/20261118000005_pago_wompi.sql` | Pago en línea: cada pedido tiene su llave (`token_publico`), los intentos de pago y las funciones que usan las funciones del servidor para iniciar el pago, recibir el aviso de Wompi y consultar o cancelar un pedido. |
+| 8 | `migrations/20261119000006_fotos_por_color.sql` | Cada foto de un producto puede ser de un color: al elegir ese color en la tienda se ven sus fotos. |
 
 Los scripts nuevos se agregan al final: si ya ejecutaste los anteriores, solo
 ejecuta los que falten, en orden. La prueba de que funcionan está en

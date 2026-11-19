@@ -65,19 +65,28 @@ Hay **un solo ingreso** (Cuenta → Iniciar sesión) para clientas y administrad
 - Las clientas se registran desde el mismo formulario. Si Supabase tiene activada
   la confirmación de correo, la app avisa que hay que confirmarlo.
 
-El panel tiene cuatro secciones:
+El panel tiene cinco secciones:
 
 1. **Pedidos:** filtra por estado y cámbialos; cada cambio queda en el historial.
-2. **Productos e inventario:** lista todos los productos con su stock (avisa
-   cuando queda poco o está agotado) y permite mostrarlos u ocultarlos con un
-   interruptor. Desde aquí se **crea un producto nuevo** o se edita uno: nombre,
-   descripción, técnica, precio, categoría, y sus colores, tallas y stock. Cada
-   fila de color y talla es una combinación que se puede comprar; no se puede
-   repetir. Un producto no se borra, se oculta; una fila que ya tiene pedidos
-   tampoco se borra, se deja con stock 0.
-3. **Fotos de artículos:** elige un artículo; sube, ordena, haz principal o borra
-   sus fotos. La primera es la que se ve en la tienda.
-4. **Fotos del sitio:** cambia o quita la foto de cada lugar de la página. Por
+2. **Datos cliente:** los números de los pedidos para tomar decisiones: estado
+   actual de los pedidos, balance general de las ventas (total vendido, ya
+   cobrado, por cobrar, cancelado), descuentos dados, compra promedio, producto
+   más vendido, producto más recomprado, colores más vendidos, tiempo de
+   recompra, ciudades con mayor recompra y cómo pagan. No cuenta los pedidos
+   cancelados; una recompra es un pedido de una clienta que ya tenía otro antes.
+3. **Productos e inventario:** lista todos los productos con su stock total y el
+   de **cada color** (avisa cuando queda poco o está agotado) y permite
+   mostrarlos u ocultarlos con un interruptor. Desde aquí se **crea un producto
+   nuevo** o se edita uno: nombre, descripción, técnica, precio, categoría, sus
+   colores con su propio stock, y sus **fotos**. Lo mínimo para crear un
+   producto es nombre, precio, un color con su stock y la foto de portada.
+   Cada color tiene su lugar para subir fotos: cuando la clienta elige ese color
+   en la tienda ve esas fotos, y si el color no tiene, ve la portada. Las fotos
+   se suben al guardar. Un producto no se borra, se oculta; una fila que ya
+   tiene pedidos tampoco se borra, se deja con stock 0.
+4. **Fotos de artículos:** elige un artículo; sube, ordena, haz principal o borra
+   sus fotos generales (la portada). La primera es la que se ve en la tienda.
+5. **Fotos del sitio:** cambia o quita la foto de cada lugar de la página. Por
    ahora solo la **portada del inicio** se muestra en la tienda; el logo, el
    banner de mayoreo y el fondo ya se pueden preparar, pero todavía no se ven.
 

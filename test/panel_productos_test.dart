@@ -1,8 +1,11 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tina_app/data/administradora.dart';
 import 'package:tina_app/data/catalogo.dart';
 import 'package:tina_app/data/sesion.dart';
+import 'package:tina_app/components/components.dart';
 import 'package:tina_app/main.dart';
 import 'package:tina_app/models/models.dart';
 import 'package:tina_app/theme/tina_tema.dart';
@@ -19,6 +22,11 @@ class _AdminFalsa implements AdministradoraRepositorio {
 
   /// Si no es nulo, borrar una variante falla con este mensaje.
   String? falloAlBorrar;
+
+  /// Fotos subidas: (id del producto, orden, color).
+  final List<(int, int, String?)> fotosSubidas = [];
+  final List<int> fotosBorradas = [];
+  int _siguienteFoto = 500;
 
   @override
   Future<Producto> guardarProducto(Producto producto) async {
@@ -63,11 +71,24 @@ class _AdminFalsa implements AdministradoraRepositorio {
     required int idProducto,
     required FotoElegida foto,
     required int orden,
-  }) => throw UnimplementedError();
+    String? color,
+  }) async {
+    fotosSubidas.add((idProducto, orden, color));
+    final id = _siguienteFoto++;
+    return ImagenProducto(
+      idImagen: id,
+      idProducto: idProducto,
+      url: 'https://ejemplo.invalid/$id.jpg',
+      ruta: 'producto-$idProducto/$id.jpg',
+      orden: orden,
+      color: color,
+    );
+  }
 
   @override
-  Future<void> borrarFotoProducto(ImagenProducto foto) =>
-      throw UnimplementedError();
+  Future<void> borrarFotoProducto(ImagenProducto foto) async {
+    fotosBorradas.add(foto.idImagen);
+  }
 
   @override
   Future<void> ordenarFotosProducto(List<ImagenProducto> enOrden) =>
@@ -113,9 +134,15 @@ class _SesionAdmin implements SesionRepositorio {
   Future<void> cerrarSesion() async {}
 }
 
-class _SelectorNulo implements SelectorFotos {
+/// Siempre "elige" la misma foto: un PNG de un píxel.
+class _SelectorFalso implements SelectorFotos {
+  static final _png = base64Decode(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+  );
+
   @override
-  Future<FotoElegida?> elegir() async => null;
+  Future<FotoElegida?> elegir() async =>
+      FotoElegida(bytes: _png, nombre: 'foto.png');
 }
 
 /// Tres productos: uno con stock normal (7), uno oculto con poco stock (2) y
@@ -194,6 +221,21 @@ class _Catalogo implements CatalogoRepositorio {
         activa: true,
       ),
     ],
+    imagenes: [
+      ImagenProducto(
+        idImagen: 1,
+        idProducto: 1,
+        url: 'https://ejemplo.invalid/portada.jpg',
+        orden: 1,
+      ),
+      ImagenProducto(
+        idImagen: 2,
+        idProducto: 1,
+        url: 'https://ejemplo.invalid/blanco.jpg',
+        orden: 2,
+        color: 'Blanco',
+      ),
+    ],
   );
 }
 
@@ -231,7 +273,7 @@ Future<_AdminFalsa> _abrirProductos(WidgetTester tester) async {
       catalogo: _Catalogo(),
       sesiones: _SesionAdmin(),
       admin: admin,
-      selectorFotos: _SelectorNulo(),
+      selectorFotos: _SelectorFalso(),
     ),
   );
   await tester.pumpAndSettle();
@@ -320,6 +362,10 @@ void main() {
         findsOneWidget,
       );
       expect(find.text('Escribe el color.'), findsOneWidget);
+      expect(
+        find.text('Sube la foto de portada del producto.'),
+        findsOneWidget,
+      );
       expect(admin.productosGuardados, isEmpty);
     });
 
@@ -337,6 +383,7 @@ void main() {
       await _tocar(tester, _en('var-n0-stock', 'cantidad-mas'));
       await _tocar(tester, _en('var-n0-stock', 'cantidad-mas'));
       await _tocar(tester, _en('var-n0-stock', 'cantidad-mas'));
+      await _tocar(tester, _llave('agregar-foto-portada'));
       await _tocar(tester, _llave('guardar-producto'));
 
       final producto = admin.productosGuardados.single;
@@ -377,6 +424,7 @@ void main() {
       await _escribir(tester, 'prod-nombre', 'Borrador');
       await _escribir(tester, 'prod-precio', '9000');
       await _escribir(tester, 'var-n0-color', 'Rojo');
+      await _tocar(tester, _llave('agregar-foto-portada'));
       await _tocar(tester, _llave('prod-oculto'));
       await _tocar(tester, _llave('guardar-producto'));
 
@@ -498,6 +546,184 @@ void main() {
       );
       expect(find.text('Editar producto'), findsWidgets);
       expect(_llave('guardar-producto'), findsOneWidget);
+    });
+  });
+
+  group('Stock y fotos por color', () {
+    testWidgets('la lista muestra cuánto queda de cada color', (tester) async {
+      await _abrirProductos(tester);
+
+      expect(
+        find.descendant(
+          of: _en('prod-admin-1', 'stock-colores'),
+          matching: find.text('Naranja · 5'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: _en('prod-admin-1', 'stock-colores'),
+          matching: find.text('Blanco · 2'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: _en('prod-admin-3', 'stock-colores'),
+          matching: find.text('Rosado · agotado'),
+        ),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('un producto nuevo no se crea sin su foto de portada', (
+      tester,
+    ) async {
+      final admin = await _abrirProductos(tester);
+      await _tocar(tester, _llave('nuevo-producto'));
+      await _escribir(tester, 'prod-nombre', 'Sin foto');
+      await _escribir(tester, 'prod-precio', '9000');
+      await _escribir(tester, 'var-n0-color', 'Rojo');
+
+      await _tocar(tester, _llave('guardar-producto'));
+
+      expect(
+        find.text('Sube la foto de portada del producto.'),
+        findsOneWidget,
+      );
+      expect(admin.productosGuardados, isEmpty);
+      expect(admin.fotosSubidas, isEmpty);
+    });
+
+    testWidgets('crea el producto con su portada y la foto de un color', (
+      tester,
+    ) async {
+      final admin = await _abrirProductos(tester);
+      await _tocar(tester, _llave('nuevo-producto'));
+      await _escribir(tester, 'prod-nombre', 'Maxi collar');
+      await _escribir(tester, 'prod-precio', '55000');
+      await _escribir(tester, 'var-n0-color', 'Naranja');
+
+      // Cada color escrito tiene su propio lugar para fotos.
+      expect(_llave('fotos-grupo-naranja'), findsOneWidget);
+      await _tocar(tester, _llave('agregar-foto-naranja'));
+      await _tocar(tester, _llave('agregar-foto-portada'));
+      expect(find.text('Nueva'), findsNWidgets(2));
+      await _tocar(tester, _llave('guardar-producto'));
+
+      // La portada se sube primero; la de color después, con su color.
+      expect(admin.fotosSubidas, [(100, 1, null), (100, 2, 'Naranja')]);
+      expect(find.text('Producto creado.'), findsOneWidget);
+    });
+
+    testWidgets(
+      'al editar se ven las fotos que ya tiene, cada una en su color',
+      (tester) async {
+        await _abrirProductos(tester);
+        await _tocar(tester, _en('prod-admin-1', 'editar-producto'));
+
+        expect(
+          find.descendant(
+            of: _llave('fotos-grupo-portada'),
+            matching: _llave('foto-existente-1'),
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(
+            of: _llave('fotos-grupo-blanco'),
+            matching: _llave('foto-existente-2'),
+          ),
+          findsOneWidget,
+        );
+        // El color Naranja todavía no tiene fotos.
+        expect(
+          find.descendant(
+            of: _llave('fotos-grupo-naranja'),
+            matching: find.text('Todavía no hay fotos.'),
+          ),
+          findsOneWidget,
+        );
+      },
+    );
+
+    testWidgets('quitar una foto la borra al guardar, y no antes', (
+      tester,
+    ) async {
+      final admin = await _abrirProductos(tester);
+      await _tocar(tester, _en('prod-admin-1', 'editar-producto'));
+
+      await _tocar(tester, _llave('quitar-foto-2'));
+      expect(_llave('foto-existente-2'), findsNothing);
+      expect(admin.fotosBorradas, isEmpty);
+
+      await _tocar(tester, _llave('guardar-producto'));
+      expect(admin.fotosBorradas, [2]);
+    });
+
+    testWidgets('cancelar no borra ni sube ninguna foto', (tester) async {
+      final admin = await _abrirProductos(tester);
+      await _tocar(tester, _en('prod-admin-1', 'editar-producto'));
+      await _tocar(tester, _llave('quitar-foto-2'));
+      await _tocar(tester, _llave('agregar-foto-naranja'));
+
+      await _tocar(tester, _llave('cancelar-producto'));
+
+      expect(admin.fotosBorradas, isEmpty);
+      expect(admin.fotosSubidas, isEmpty);
+    });
+
+    testWidgets('agregar una foto a un color de un producto que ya existe', (
+      tester,
+    ) async {
+      final admin = await _abrirProductos(tester);
+      await _tocar(tester, _en('prod-admin-1', 'editar-producto'));
+
+      await _tocar(tester, _llave('agregar-foto-naranja'));
+      await _tocar(tester, _llave('guardar-producto'));
+
+      // Sigue en el orden: ya había las fotos 1 y 2.
+      expect(admin.fotosSubidas, [(1, 3, 'Naranja')]);
+    });
+
+    testWidgets(
+      'si se cambia el nombre de un color, sus fotos nuevas lo siguen',
+      (tester) async {
+        final admin = await _abrirProductos(tester);
+        await _tocar(tester, _llave('nuevo-producto'));
+        await _escribir(tester, 'prod-nombre', 'Collar');
+        await _escribir(tester, 'prod-precio', '55000');
+        await _escribir(tester, 'var-n0-color', 'Narnja');
+        await _tocar(tester, _llave('agregar-foto-portada'));
+        await _tocar(tester, _llave('agregar-foto-narnja'));
+
+        await _escribir(tester, 'var-n0-color', 'Naranja');
+        await _tocar(tester, _llave('guardar-producto'));
+
+        expect(admin.fotosSubidas.last, (100, 2, 'Naranja'));
+      },
+    );
+
+    testWidgets('en la tienda, el color elegido muestra sus fotos', (
+      tester,
+    ) async {
+      final semantica = tester.ensureSemantics();
+      await _abrirProductos(tester);
+      await _tocar(tester, find.text('Ver tienda'));
+      await _tocar(tester, _llave('producto-1'));
+
+      List<String> fotos() =>
+          tester.widget<TinaFotoProducto>(find.byType(TinaFotoProducto)).fotos;
+
+      // Naranja no tiene fotos propias: se ve la portada.
+      expect(fotos(), ['https://ejemplo.invalid/portada.jpg']);
+
+      await _tocar(tester, find.bySemanticsLabel('Blanco'));
+      expect(fotos(), ['https://ejemplo.invalid/blanco.jpg']);
+
+      await _tocar(tester, find.bySemanticsLabel('Naranja'));
+      expect(fotos(), ['https://ejemplo.invalid/portada.jpg']);
+      semantica.dispose();
     });
   });
 }

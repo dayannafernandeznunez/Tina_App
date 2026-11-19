@@ -77,10 +77,13 @@ class SelectorFotosDispositivo implements SelectorFotos {
 /// `SesionRepositorio`, igual para clientas y administradora.
 abstract class AdministradoraRepositorio {
   /// Sube una foto a un artículo y la deja al final de sus fotos.
+  ///
+  /// Con [color], la foto es de ese color; sin él, es una foto general.
   Future<ImagenProducto> subirFotoProducto({
     required int idProducto,
     required FotoElegida foto,
     required int orden,
+    String? color,
   });
 
   Future<void> borrarFotoProducto(ImagenProducto foto);
@@ -147,9 +150,12 @@ class AdministradoraSupabase implements AdministradoraRepositorio {
     required int idProducto,
     required FotoElegida foto,
     required int orden,
+    String? color,
   }) async {
+    // Dos fotos del mismo producto pueden subirse en el mismo milisegundo
+    // (varias a la vez): el orden las distingue.
     final ruta =
-        'producto-$idProducto/${DateTime.now().millisecondsSinceEpoch}.${foto.extension}';
+        'producto-$idProducto/${DateTime.now().millisecondsSinceEpoch}-$orden.${foto.extension}';
     final url = await _subir(_carpetaProductos, ruta, foto);
     try {
       final fila = await _c
@@ -159,6 +165,7 @@ class AdministradoraSupabase implements AdministradoraRepositorio {
             'url': url,
             'ruta': ruta,
             'orden': orden,
+            'color': color,
           })
           .select()
           .single();

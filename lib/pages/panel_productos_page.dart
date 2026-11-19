@@ -107,6 +107,7 @@ class PanelProductosPage extends StatelessWidget {
                     detalle:
                         '${p.categoria} · ${formatoPesos(p.producto.precio)}',
                     stock: p.variantes.fold(0, (s, v) => s + v.stock),
+                    stockPorColor: p.stockPorColor,
                     visible: p.producto.activo,
                     ocupado: ocupado,
                     onEditar: () => onEditar(p.producto.idProducto),

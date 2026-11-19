@@ -51,6 +51,8 @@ class DetallePage extends StatelessWidget {
   Widget build(BuildContext context) {
     final producto = vista.producto;
     final stock = vista.stockDe(color, talla);
+    // Al elegir un color se ven las fotos de ese color (o las generales).
+    final fotos = vista.fotosPara(color);
     final volumen = promociones.where((p) => p.tipo == 'volumen').firstOrNull;
 
     return TinaScaffold(
@@ -78,8 +80,8 @@ class DetallePage extends StatelessWidget {
             flexIzquierda: 5,
             flexDerecha: 6,
             izquierda: TinaFotoProducto(
-              total: vista.fotos.isEmpty ? 3 : vista.fotos.length,
-              fotos: vista.fotos,
+              total: fotos.isEmpty ? 3 : fotos.length,
+              fotos: fotos,
               actual: foto,
               onCambiar: onFoto,
             ),

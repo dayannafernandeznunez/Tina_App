@@ -21,6 +21,7 @@ class _AdminFalsa implements AdministradoraRepositorio {
     required int idProducto,
     required FotoElegida foto,
     required int orden,
+    String? color,
   }) async {
     llamadas.add('subir:$idProducto:$orden');
     final id = _siguiente++;

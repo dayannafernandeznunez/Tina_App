@@ -31,6 +31,7 @@ for (const f of [
   'seed.sql',
   'migrations/20261118000004_pedidos_reales.sql',
   'migrations/20261118000005_pago_wompi.sql',
+  'migrations/20261119000006_fotos_por_color.sql',
 ]) {
   try {
     await db.exec(leer(f));
@@ -46,7 +47,7 @@ await db.exec(`
   grant all on all sequences in schema public to anon, authenticated;
   grant select on auth.users to authenticated;
 `);
-console.log('Los 6 scripts corren sin errores.\n');
+console.log('Los 7 scripts corren sin errores.\n');
 
 let ok = 0, mal = 0;
 const igual = (nombre, real, esperado) => {
@@ -279,6 +280,15 @@ const stockAdmin = await stock(11);
 await db.query(`select public.cambiar_estado_pedido($1, 'cancelado')`, [r.id_pedido]);
 igual('la administradora cancela y el stock vuelve', [await estadoDe(r.id_pedido), await stock(11)], ['cancelado', stockAdmin + 1]);
 await como(null);
+
+// ---- Fotos por color: la administradora las sube, todos las ven.
+await como(ADMIN);
+await db.query(`insert into imagen_producto (id_producto, url, ruta, orden, color) values (1, 'https://x/general.jpg', 'p1/g.jpg', 1, null), (1, 'https://x/blanco.jpg', 'p1/b.jpg', 2, 'Blanco')`);
+await como(null);
+await db.exec('set role anon');
+igual('una visitante ve las fotos con su color', (await q(`select color from imagen_producto where id_producto = 1 order by orden`)).map((f) => f.color), [null, 'Blanco']);
+await falla('una visitante no puede subir fotos', `insert into imagen_producto (id_producto, url, ruta, orden, color) values (1, 'https://x/z.jpg', 'p1/z.jpg', 3, 'Rojo')`, [], '');
+await db.exec('reset role');
 
 console.log(`\n${ok} bien, ${mal} mal`);
 process.exit(mal ? 1 : 0);

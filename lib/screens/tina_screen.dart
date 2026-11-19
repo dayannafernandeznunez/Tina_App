@@ -8,6 +8,7 @@ import '../data/sesion.dart';
 import '../data/datos_simulados.dart';
 import '../logic/calculos.dart';
 import '../logic/borrador_producto.dart';
+import '../logic/metricas.dart';
 import '../logic/validaciones.dart';
 import '../logic/vistas.dart';
 import '../models/models.dart';
@@ -21,6 +22,7 @@ import '../pages/inicio_page.dart';
 import '../pages/lista_page.dart';
 import '../pages/login_page.dart';
 import '../pages/panel_page.dart';
+import '../pages/panel_datos_page.dart';
 import '../pages/panel_fotos_articulos_page.dart';
 import '../pages/panel_fotos_sitio_page.dart';
 import '../pages/panel_productos_page.dart';
@@ -224,33 +226,52 @@ class _TinaScreenState extends State<TinaScreen> {
     for (final c in _categorias) c.nombre,
   ];
 
-  ProductoVista _vista(Producto p) => ProductoVista(
-    producto: p,
-    categoria: _categorias
-        .firstWhere((c) => c.idCategoria == p.idCategoria)
-        .nombre,
-    variantes: [
-      for (final v in _variantes)
-        if (v.idProducto == p.idProducto) v,
-    ],
-    fotos: [
-      for (final i in ([
-        for (final i in _imagenes)
-          if (i.idProducto == p.idProducto) i,
-      ]..sort((a, b) => a.orden.compareTo(b.orden))))
-        i.url,
-    ],
-  );
+  ProductoVista _vista(Producto p) {
+    final todas = [
+      for (final i in _imagenes)
+        if (i.idProducto == p.idProducto) i,
+    ]..sort((a, b) => a.orden.compareTo(b.orden));
+    final generales = [
+      for (final i in todas)
+        if (i.color == null) i.url,
+    ];
+    final porColor = <String, List<String>>{};
+    for (final i in todas) {
+      if (i.color != null) {
+        (porColor[claveColor(i.color!)] ??= []).add(i.url);
+      }
+    }
+    return ProductoVista(
+      producto: p,
+      categoria: _categorias
+          .firstWhere((c) => c.idCategoria == p.idCategoria)
+          .nombre,
+      variantes: [
+        for (final v in _variantes)
+          if (v.idProducto == p.idProducto) v,
+      ],
+      fotos: generales.isNotEmpty ? generales : [for (final i in todas) i.url],
+      fotosPorColor: porColor,
+    );
+  }
 
   /// Foto principal de cada producto que tenga fotos (id del producto ->
-  /// dirección), en el orden que eligió la administradora.
+  /// dirección): la primera foto general y, si no tiene, la primera de todas.
   Map<int, String> get _fotosPrincipales {
     final primeras = <int, ImagenProducto>{};
     for (final i in _imagenes) {
       final actual = primeras[i.idProducto];
-      if (actual == null || i.orden < actual.orden) primeras[i.idProducto] = i;
+      if (actual == null || _antesComoPortada(i, actual)) {
+        primeras[i.idProducto] = i;
+      }
     }
     return {for (final e in primeras.entries) e.key: e.value.url};
+  }
+
+  /// ¿[a] debe ser portada antes que [b]? Las generales ganan a las de color.
+  bool _antesComoPortada(ImagenProducto a, ImagenProducto b) {
+    if ((a.color == null) != (b.color == null)) return a.color == null;
+    return a.orden < b.orden;
   }
 
   List<ProductoVista> _vistas({String? categoria}) => [
@@ -348,9 +369,10 @@ class _TinaScreenState extends State<TinaScreen> {
       _idProductoFotos ??
       (_productos.isEmpty ? 0 : _productos.first.idProducto);
 
+  /// Las fotos generales del producto (las de color se manejan al editarlo).
   List<ImagenProducto> get _fotosDelProducto => [
     for (final i in _imagenes)
-      if (i.idProducto == _productoFotos) i,
+      if (i.idProducto == _productoFotos && i.color == null) i,
   ]..sort((a, b) => a.orden.compareTo(b.orden));
 
   Future<void> _restaurarSesion() async {
@@ -477,10 +499,17 @@ class _TinaScreenState extends State<TinaScreen> {
   void _editarProducto(int idProducto) {
     final producto = _productos.firstWhere((p) => p.idProducto == idProducto);
     setState(() {
-      _borrador = BorradorProducto.desde(producto, [
-        for (final v in _variantes)
-          if (v.idProducto == idProducto) v,
-      ]);
+      _borrador = BorradorProducto.desde(
+        producto,
+        [
+          for (final v in _variantes)
+            if (v.idProducto == idProducto) v,
+        ],
+        fotos: [
+          for (final i in _imagenes)
+            if (i.idProducto == idProducto) i,
+        ],
+      );
       _mostrarErroresProducto = false;
     });
     _empujar(Ruta.productoEditar);
@@ -503,14 +532,58 @@ class _TinaScreenState extends State<TinaScreen> {
   );
 
   void _campoVariante(String clave, String campo, String valor) =>
-      _cambiarBorrador(
-        (b) => b.conVariante(
-          clave,
-          (v) => campo == 'color'
-              ? v.copyWith(color: valor)
-              : v.copyWith(talla: valor),
-        ),
-      );
+      _cambiarBorrador((b) {
+        if (campo != 'color') {
+          return b.conVariante(clave, (v) => v.copyWith(talla: valor));
+        }
+        // Si era el único renglón de ese color, las fotos que ya había elegido
+        // para él siguen al color con su nuevo nombre.
+        final anterior = b.variantes.firstWhere((v) => v.clave == clave).color;
+        final unico =
+            anterior.trim().isNotEmpty &&
+            b.variantes
+                    .where((v) => claveColor(v.color) == claveColor(anterior))
+                    .length ==
+                1;
+        final cambiado = b.conVariante(clave, (v) => v.copyWith(color: valor));
+        if (!unico || valor.trim().isEmpty) return cambiado;
+        return cambiado.copyWith(
+          fotosNuevas: [
+            for (final f in cambiado.fotosNuevas)
+              f.color != null && claveColor(f.color!) == claveColor(anterior)
+                  ? f.conColor(valor.trim())
+                  : f,
+          ],
+        );
+      });
+
+  /// Elige una foto del dispositivo para el color dado (`null` = portada). Se
+  /// sube cuando se guarda el producto.
+  Future<void> _agregarFotoBorrador(String? color) async {
+    final foto = await _elegirFoto();
+    if (foto == null || !mounted) return;
+    _cambiarBorrador(
+      (b) => b.copyWith(
+        fotosNuevas: [
+          ...b.fotosNuevas,
+          FotoNueva(clave: _claveNueva(), foto: foto, color: color),
+        ],
+      ),
+    );
+  }
+
+  void _quitarFotoNueva(String clave) => _cambiarBorrador(
+    (b) => b.copyWith(
+      fotosNuevas: [
+        for (final f in b.fotosNuevas)
+          if (f.clave != clave) f,
+      ],
+    ),
+  );
+
+  void _quitarFotoExistente(int idImagen) => _cambiarBorrador(
+    (b) => b.copyWith(idsFotosABorrar: [...b.idsFotosABorrar, idImagen]),
+  );
 
   void _quitarVariante(String clave) => _cambiarBorrador(
     (b) => b.copyWith(
@@ -549,6 +622,8 @@ class _TinaScreenState extends State<TinaScreen> {
 
     int? idCreado;
     final idsGuardados = <String, int>{};
+    final fotosSubidas = <String>{};
+    final fotosBorradas = <int>{};
     await _accionFotos(() async {
       final admin = widget.admin!;
       try {
@@ -567,6 +642,43 @@ class _TinaScreenState extends State<TinaScreen> {
             await admin.borrarVariante(id);
           }
         }
+
+        // Fotos: primero se borran las que se quitaron y luego se suben las
+        // nuevas, la portada antes que las de color.
+        for (final id in borrador.idsFotosABorrar) {
+          final foto = borrador.fotosExistentes.firstWhere(
+            (f) => f.idImagen == id,
+          );
+          await admin.borrarFotoProducto(foto);
+          fotosBorradas.add(id);
+          if (mounted) {
+            setState(() {
+              _imagenes = [
+                for (final f in _imagenes)
+                  if (f.idImagen != id) f,
+              ];
+            });
+          }
+        }
+        var orden = _imagenes
+            .where((i) => i.idProducto == producto.idProducto)
+            .fold(0, (m, i) => i.orden > m ? i.orden : m);
+        final porSubir = [
+          ...borrador.fotosNuevas.where((f) => f.color == null),
+          ...borrador.fotosNuevas.where((f) => f.color != null),
+        ];
+        for (final f in porSubir) {
+          orden++;
+          final imagen = await admin.subirFotoProducto(
+            idProducto: producto.idProducto,
+            foto: f.foto,
+            orden: orden,
+            color: f.color,
+          );
+          fotosSubidas.add(f.clave);
+          if (mounted) setState(() => _imagenes = [..._imagenes, imagen]);
+        }
+
         if (!mounted) return;
         setState(() {
           _productos = [
@@ -587,10 +699,12 @@ class _TinaScreenState extends State<TinaScreen> {
         // reintentar no se duplica, y el catálogo se vuelve a leer.
         if (mounted) {
           setState(() {
-            _borrador = _borrador?.conIds(
-              idProducto: idCreado,
-              idsVariantes: idsGuardados,
-            );
+            _borrador = _borrador
+                ?.conIds(idProducto: idCreado, idsVariantes: idsGuardados)
+                .sinFotosHechas(
+                  clavesSubidas: fotosSubidas,
+                  idsBorradas: fotosBorradas,
+                );
           });
           _cargarCatalogo();
         }
@@ -635,6 +749,9 @@ class _TinaScreenState extends State<TinaScreen> {
       ),
       onQuitarVariante: _quitarVariante,
       onAgregarVariante: _agregarVariante,
+      onAgregarFoto: _agregarFotoBorrador,
+      onQuitarFotoNueva: _quitarFotoNueva,
+      onQuitarFotoExistente: _quitarFotoExistente,
       onGuardar: _guardarProducto,
       onCancelar: _cerrarEditorProducto,
     );
@@ -889,6 +1006,7 @@ class _TinaScreenState extends State<TinaScreen> {
     final tallas = vista.tallasDe(color);
     setState(() {
       _color = color;
+      _foto = 0;
       if (!tallas.contains(_talla)) _talla = tallas.first;
       _cantidad = _limitarCantidad(_cantidad, vista.stockDe(_color, _talla));
     });
@@ -1922,6 +2040,19 @@ class _TinaScreenState extends State<TinaScreen> {
           onPedido: _verPedido,
           onVerTienda: _irInicio,
           onSeccion: (s) => setState(() => _seccionPanel = s),
+          onSalir: widget.sesiones == null ? null : _cerrarSesion,
+        );
+      case SeccionPanel.datos:
+        return PanelDatosPage(
+          metricas: Metricas.calcular(
+            pedidos: _pedidos,
+            detalles: _detalles,
+            variantes: _variantes,
+            productos: _productos,
+            envios: _envios,
+          ),
+          onSeccion: (s) => setState(() => _seccionPanel = s),
+          onVerTienda: _irInicio,
           onSalir: widget.sesiones == null ? null : _cerrarSesion,
         );
       case SeccionPanel.productos:

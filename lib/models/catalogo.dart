@@ -69,6 +69,7 @@ class ImagenProducto {
     required this.url,
     required this.orden,
     this.ruta = '',
+    this.color,
   });
 
   /// Arma la foto a partir de una fila de Supabase.
@@ -78,6 +79,7 @@ class ImagenProducto {
     url: fila['url'] as String,
     orden: fila['orden'] as int,
     ruta: (fila['ruta'] as String?) ?? '',
+    color: fila['color'] as String?,
   );
 
   final int idImagen;
@@ -86,14 +88,23 @@ class ImagenProducto {
   final int orden;
   final String ruta;
 
+  /// El color al que pertenece la foto; `null` si es una foto general del
+  /// producto (su portada).
+  final String? color;
+
   ImagenProducto copyWith({int? orden}) => ImagenProducto(
     idImagen: idImagen,
     idProducto: idProducto,
     url: url,
     orden: orden ?? this.orden,
     ruta: ruta,
+    color: color,
   );
 }
+
+/// La clave con la que se comparan los colores: sin mayúsculas ni espacios de
+/// más, para que "Blanco" y " blanco " sean el mismo color.
+String claveColor(String color) => color.trim().toLowerCase();
 
 /// Tabla VARIANTE_PRODUCTO. El stock se lleva por combinación de color y talla.
 class VarianteProducto {

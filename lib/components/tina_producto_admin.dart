@@ -15,6 +15,7 @@ class TinaProductoAdmin extends StatelessWidget {
     required this.ocupado,
     required this.onEditar,
     required this.onAlternar,
+    this.stockPorColor = const {},
   });
 
   final String nombre;
@@ -24,6 +25,10 @@ class TinaProductoAdmin extends StatelessWidget {
 
   /// Unidades que quedan, sumando todas sus variantes.
   final int stock;
+
+  /// Cuánto queda de cada color (sumando sus tallas). Los que están en 0 se
+  /// marcan como agotados.
+  final Map<String, int> stockPorColor;
   final bool visible;
   final bool ocupado;
   final VoidCallback onEditar;
@@ -92,6 +97,19 @@ class TinaProductoAdmin extends StatelessWidget {
                       color: colorStock,
                     ),
                   ),
+                  if (stockPorColor.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 3),
+                      child: Wrap(
+                        key: const ValueKey('stock-colores'),
+                        spacing: 6,
+                        runSpacing: 4,
+                        children: [
+                          for (final e in stockPorColor.entries)
+                            _EtiquetaColor(color: e.key, stock: e.value),
+                        ],
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -119,6 +137,40 @@ class TinaProductoAdmin extends StatelessWidget {
             ],
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Un color con lo que queda de él: "Blanco 5" o "Rosado agotado".
+class _EtiquetaColor extends StatelessWidget {
+  const _EtiquetaColor({required this.color, required this.stock});
+
+  final String color;
+  final int stock;
+
+  @override
+  Widget build(BuildContext context) {
+    final agotado = stock <= 0;
+    final poco = !agotado && stock <= TinaProductoAdmin.pocoStock;
+    final tinta = agotado
+        ? TinaColores.rojo
+        : poco
+        ? const Color(0xFFB84A00)
+        : TinaColores.marron;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: tinta.withValues(alpha: 0.55)),
+      ),
+      child: Text(
+        agotado ? '$color · agotado' : '$color · $stock',
+        style: TinaTipografia.estilo(
+          tamano: 12,
+          peso: FontWeight.w800,
+          color: tinta,
+        ),
       ),
     );
   }
