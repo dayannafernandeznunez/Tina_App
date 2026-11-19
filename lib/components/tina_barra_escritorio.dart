@@ -51,12 +51,7 @@ class TinaBarraEscritorio extends StatelessWidget
     final hayTitulo = titulo != null && titulo!.isNotEmpty;
     return Container(
       height: 76,
-      decoration: const BoxDecoration(
-        color: TinaColores.cremaBarra,
-        border: Border(
-          bottom: BorderSide(color: TinaColores.dorado, width: 1.5),
-        ),
-      ),
+      decoration: const BoxDecoration(color: TinaColores.cremaBarra),
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: anchoContenido),

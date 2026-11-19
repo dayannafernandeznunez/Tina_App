@@ -15,11 +15,20 @@ class TinaColores {
   static const Color durazno = Color(0xFFFFD2A0);
   static const Color melocoton = Color(0xFFFFE3CC);
   static const Color crema = Color(0xFFFFF8EF);
-  static const Color cremaBarra = Color(0xFFFFF6EC);
-  static const Color cremaCampo = Color(0xFFFFFAF4);
+  static const Color cremaBarra = Color(0xFFFFFFFF);
+  static const Color cremaCampo = Color(0xFFFFFFFF);
   static const Color cremaSuave = Color(0xFFFFF1E2);
   static const Color cremaHover = Color(0xFFFFEEDD);
   static const Color blanco = Color(0xFFFFFFFF);
+
+  // Estilo del carrusel de la feria: naranja plano, manchas rosadas y coral.
+  static const Color rosaClaro = Color(0xFFF58AA0);
+  static const Color rosaFuerte = Color(0xFFD8416A);
+  static const Color coral = Color(0xFFE8452C);
+
+  /// Fondo de los campos de texto y de las pastillas: durazno suave, sin borde.
+  static const Color campo = Color(0xFFFFEEDF);
+  static const Color campoHover = Color(0xFFFFE4CC);
 }
 
 /// Tipografía de Tina: Bricolage Grotesque (pesos 500 y 800) y, para los

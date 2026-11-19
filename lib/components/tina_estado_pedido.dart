@@ -76,7 +76,6 @@ class TinaEstadoPedido extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final paleta = _paletas[estado]!;
-    final borde = paleta.punto.withValues(alpha: 0.4);
 
     if (modo == ModoEstado.etiqueta) {
       return Container(
@@ -84,7 +83,6 @@ class TinaEstadoPedido extends StatelessWidget {
         decoration: BoxDecoration(
           color: paleta.fondo,
           borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: borde),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -121,7 +119,6 @@ class TinaEstadoPedido extends StatelessWidget {
       decoration: BoxDecoration(
         color: paleta.fondo,
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: borde, width: 1.5),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,

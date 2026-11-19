@@ -134,7 +134,6 @@ class _TarjetaAjuste extends StatelessWidget {
       decoration: BoxDecoration(
         color: TinaColores.cremaCampo,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: TinaColores.dorado, width: 1.5),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -160,10 +159,7 @@ class _TarjetaAjuste extends StatelessWidget {
                 borderRadius: BorderRadius.circular(16),
                 color: TinaColores.cremaSuave,
               ),
-              foregroundDecoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: TinaColores.dorado),
-              ),
+
               child: ajuste.tieneFoto
                   ? TinaImagenRed(url: ajuste.url!, radio: 16)
                   : Center(

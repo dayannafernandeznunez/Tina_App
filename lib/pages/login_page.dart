@@ -66,17 +66,28 @@ class LoginPage extends StatelessWidget {
         anchoMaximo: 520,
         arriba: 26,
         children: [
-          Text(
-            registro ? 'Bienvenida' : 'Hola de nuevo',
-            style: TinaTipografia.serif(tamano: 30, color: TinaColores.rojo),
-          ),
-          Text(
-            registro ? 'Crea tu cuenta' : 'Inicia sesión',
-            style: TinaTipografia.estilo(
-              tamano: 36,
-              peso: FontWeight.w800,
-              espaciado: -1.1,
-              altura: 1,
+          TinaEncabezadoMarca(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  registro ? 'Bienvenida' : 'Hola de nuevo',
+                  style: TinaTipografia.serif(
+                    tamano: 32,
+                    color: TinaColores.blanco,
+                  ),
+                ),
+                Text(
+                  registro ? 'Crea tu cuenta' : 'Inicia sesión',
+                  style: TinaTipografia.estilo(
+                    tamano: 42,
+                    peso: FontWeight.w800,
+                    color: TinaColores.blanco,
+                    espaciado: -1.8,
+                    altura: 0.98,
+                  ),
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 14),

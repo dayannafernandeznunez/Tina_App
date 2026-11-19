@@ -46,7 +46,6 @@ class TinaOpcionCompra extends StatelessWidget {
                     ? TinaColores.cremaSuave
                     : TinaColores.cremaCampo,
                 borderRadius: BorderRadius.circular(22),
-                border: Border.all(color: borde, width: 1.5),
               ),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,

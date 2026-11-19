@@ -62,35 +62,33 @@ class ConfirmacionPage extends StatelessWidget {
         anchoMaximo: 640,
         arriba: 28,
         children: [
-          Center(
+          TinaEncabezadoMarca(
             child: Column(
-              spacing: 6,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const EstrellaTina(tamano: 52, color: TinaColores.naranja),
-                const SizedBox(height: 6),
                 Text(
-                  contraentrega ? '¡Pedido' : '¡Pedido',
+                  '¡Pedido',
                   style: TinaTipografia.estilo(
-                    tamano: 40,
+                    tamano: 44,
                     peso: FontWeight.w800,
-                    espaciado: -1.2,
+                    color: TinaColores.blanco,
+                    espaciado: -1.8,
                     altura: 0.95,
                   ),
                 ),
                 Text(
                   contraentrega ? 'recibido!' : 'confirmado!',
                   style: TinaTipografia.serif(
-                    tamano: 44,
-                    color: TinaColores.rojo,
+                    tamano: 50,
+                    color: TinaColores.blanco,
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 10),
                 Text(
                   'Gracias por regalarte algo hecho a mano.',
-                  textAlign: TextAlign.center,
                   style: TinaTipografia.estilo(
                     tamano: 15,
-                    color: TinaColores.marron,
+                    color: TinaColores.blanco,
                   ),
                 ),
               ],

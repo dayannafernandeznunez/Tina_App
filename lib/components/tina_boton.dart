@@ -45,13 +45,9 @@ class _TinaBotonState extends State<TinaBoton> {
           )
         : BoxDecoration(
             color: _presionado || _encima
-                ? TinaColores.cremaHover
-                : TinaColores.crema,
+                ? TinaColores.melocoton
+                : TinaColores.cremaSuave,
             borderRadius: BorderRadius.circular(999),
-            border: Border.all(
-              color: _encima ? TinaColores.naranja : TinaColores.dorado,
-              width: 2,
-            ),
           );
 
     return Semantics(

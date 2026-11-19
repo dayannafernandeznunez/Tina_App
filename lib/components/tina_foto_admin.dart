@@ -46,10 +46,7 @@ class TinaFotoAdmin extends StatelessWidget {
               borderRadius: BorderRadius.circular(22),
               color: TinaColores.cremaSuave,
             ),
-            foregroundDecoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(22),
-              border: Border.all(color: TinaColores.dorado, width: 1.5),
-            ),
+
             child: Stack(
               children: [
                 Positioned.fill(child: TinaImagenRed(url: url, radio: 22)),

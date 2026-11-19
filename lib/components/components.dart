@@ -12,6 +12,8 @@ export 'tina_estado_pedido.dart';
 export 'tina_etiqueta_descuento.dart';
 export 'tina_fila_resumen.dart';
 export 'tina_foto_admin.dart';
+export 'tina_encabezado_marca.dart';
+export 'tina_fondo_marca.dart';
 export 'tina_foto_producto.dart';
 export 'tina_grilla_productos.dart';
 export 'tina_hero.dart';

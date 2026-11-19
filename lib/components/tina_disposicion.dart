@@ -83,10 +83,6 @@ class TinaDosColumnas extends StatelessWidget {
                       decoration: BoxDecoration(
                         color: TinaColores.cremaCampo,
                         borderRadius: BorderRadius.circular(28),
-                        border: Border.all(
-                          color: TinaColores.dorado,
-                          width: 1.5,
-                        ),
                       ),
                       child: derecha,
                     )

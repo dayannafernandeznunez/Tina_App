@@ -20,10 +20,7 @@ class TinaBarraAccion extends StatelessWidget {
         escritorio ? 24 : 20,
         16,
       ),
-      decoration: const BoxDecoration(
-        color: TinaColores.cremaBarra,
-        border: Border(top: BorderSide(color: TinaColores.dorado, width: 1.5)),
-      ),
+      decoration: const BoxDecoration(color: TinaColores.cremaBarra),
       child: SafeArea(
         top: false,
         child: Center(

@@ -30,7 +30,6 @@ class TinaEtiquetaDescuento extends StatelessWidget {
           decoration: BoxDecoration(
             color: fuerte ? TinaColores.naranja : TinaColores.cremaSuave,
             borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: TinaColores.dorado, width: 1.5),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,

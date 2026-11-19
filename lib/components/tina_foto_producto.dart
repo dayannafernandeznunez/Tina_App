@@ -57,10 +57,7 @@ class TinaFotoProducto extends StatelessWidget {
               borderRadius: BorderRadius.circular(28),
               gradient: _fondos[actual % _fondos.length],
             ),
-            foregroundDecoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(28),
-              border: Border.all(color: TinaColores.dorado, width: 1.5),
-            ),
+
             child: Stack(
               children: [
                 if (fotos.isNotEmpty)
@@ -196,7 +193,6 @@ class _Flecha extends StatelessWidget {
               decoration: BoxDecoration(
                 color: TinaColores.crema,
                 shape: BoxShape.circle,
-                border: Border.all(color: TinaColores.dorado, width: 1.5),
               ),
               child: Icon(icono, size: 24, color: TinaColores.tinta),
             ),

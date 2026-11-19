@@ -41,7 +41,6 @@ class TinaItemCarrito extends StatelessWidget {
       decoration: BoxDecoration(
         color: TinaColores.cremaCampo,
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: TinaColores.dorado, width: 1.5),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -72,7 +71,6 @@ class TinaItemCarrito extends StatelessWidget {
                       decoration: BoxDecoration(
                         color: color,
                         shape: BoxShape.circle,
-                        border: Border.all(color: TinaColores.crema, width: 2),
                       ),
                     ),
                   ),

@@ -45,10 +45,6 @@ class TinaTarjetaPedido extends StatelessWidget {
             decoration: BoxDecoration(
               color: encima ? TinaColores.cremaSuave : TinaColores.cremaCampo,
               borderRadius: BorderRadius.circular(22),
-              border: Border.all(
-                color: encima ? TinaColores.naranja : TinaColores.dorado,
-                width: 1.5,
-              ),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -135,7 +131,6 @@ class _MenuEstado extends StatelessWidget {
       decoration: BoxDecoration(
         color: TinaColores.crema,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: TinaColores.dorado, width: 1.5),
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<EstadoPedido>(

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../theme/tina_tema.dart';
 import '../utils/adaptable.dart';
 import 'estrella_tina.dart';
+import 'tina_fondo_marca.dart';
 
 /// Intro animada de Tina: las letras se escriben una por una con un lápiz que
 /// las traza y luego se desvanece; la estrella de la ı aparece con un rebote,
@@ -78,7 +79,7 @@ class _TinaIntroState extends State<TinaIntro>
     final estilo = TinaTipografia.estilo(
       tamano: tamano,
       peso: FontWeight.w800,
-      color: TinaColores.naranja,
+      color: TinaColores.blanco,
       espaciado: -tamano * 0.015,
       altura: 1,
     );
@@ -113,58 +114,62 @@ class _TinaIntroState extends State<TinaIntro>
               );
               final eslogan = _tramo(t, 0.72, 0.90);
 
-              return Material(
-                color: TinaColores.crema,
-                child: Opacity(
-                  opacity: salida,
-                  child: Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            for (var i = 0; i < _letras.length; i++)
-                              _Letra(
-                                llave: ValueKey('intro-letra-$i'),
-                                letra: _letras[i],
-                                estilo: estilo,
-                                progreso: progresos[i],
-                                lapiz: lapizVisible,
-                                tamano: tamano,
-                                estrella: i == 1 ? estrella : null,
+              return Opacity(
+                opacity: salida,
+                child: Material(
+                  color: TinaColores.naranja,
+                  child: TinaFondoMarca(
+                    radio: 0,
+                    variante: VarianteFondo.completo,
+                    child: Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              for (var i = 0; i < _letras.length; i++)
+                                _Letra(
+                                  llave: ValueKey('intro-letra-$i'),
+                                  letra: _letras[i],
+                                  estilo: estilo,
+                                  progreso: progresos[i],
+                                  lapiz: lapizVisible,
+                                  tamano: tamano,
+                                  estrella: i == 1 ? estrella : null,
+                                ),
+                            ],
+                          ),
+                          SizedBox(height: tamano * 0.18),
+                          Opacity(
+                            opacity: _tramo(t, 0.72, 0.78),
+                            child: Transform.translate(
+                              offset: Offset(
+                                0,
+                                (1 - Curves.elasticOut.transform(eslogan)) * 34,
                               ),
-                          ],
-                        ),
-                        SizedBox(height: tamano * 0.18),
-                        Opacity(
-                          opacity: _tramo(t, 0.72, 0.78),
-                          child: Transform.translate(
-                            offset: Offset(
-                              0,
-                              (1 - Curves.elasticOut.transform(eslogan)) * 34,
+                              child: Text(
+                                'Tan latinas como tú',
+                                style: TinaTipografia.serif(
+                                  tamano: tamano * 0.3,
+                                  color: TinaColores.blanco,
+                                ),
+                              ),
                             ),
+                          ),
+                          SizedBox(height: tamano * 0.5),
+                          Opacity(
+                            opacity: _tramo(t, 0.2, 0.3) * 0.7,
                             child: Text(
-                              'Tan latinas como tú',
-                              style: TinaTipografia.serif(
-                                tamano: tamano * 0.3,
-                                color: TinaColores.rojo,
+                              'Toca para saltar',
+                              style: TinaTipografia.estilo(
+                                tamano: 13,
+                                color: Colors.white70,
                               ),
                             ),
                           ),
-                        ),
-                        SizedBox(height: tamano * 0.5),
-                        Opacity(
-                          opacity: _tramo(t, 0.2, 0.3) * 0.7,
-                          child: Text(
-                            'Toca para saltar',
-                            style: TinaTipografia.estilo(
-                              tamano: 13,
-                              color: TinaColores.marron,
-                            ),
-                          ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -243,7 +248,7 @@ class _Letra extends StatelessWidget {
                   scale: estrella,
                   child: EstrellaTina(
                     tamano: tamano * 0.3,
-                    color: TinaColores.rojo,
+                    color: TinaColores.blanco,
                   ),
                 ),
               ),

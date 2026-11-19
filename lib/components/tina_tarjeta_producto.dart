@@ -62,10 +62,7 @@ class TinaTarjetaProducto extends StatelessWidget {
                         stops: [0, 0.55, 1],
                       ),
                     ),
-                    foregroundDecoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(26),
-                      border: Border.all(color: TinaColores.dorado, width: 1.5),
-                    ),
+
                     child: Stack(
                       children: [
                         if (foto != null)
@@ -83,7 +80,6 @@ class TinaTarjetaProducto extends StatelessWidget {
                             decoration: BoxDecoration(
                               color: TinaColores.crema,
                               borderRadius: BorderRadius.circular(999),
-                              border: Border.all(color: TinaColores.dorado),
                             ),
                             child: Text(
                               categoria,
@@ -163,10 +159,7 @@ class TinaTarjetaProducto extends StatelessWidget {
                                   decoration: BoxDecoration(
                                     color: color,
                                     shape: BoxShape.circle,
-                                    border: Border.all(
-                                      color: TinaColores.dorado,
-                                      width: 1.5,
-                                    ),
+                                    border: Border.all(color: Colors.black12),
                                   ),
                                 ),
                             ],

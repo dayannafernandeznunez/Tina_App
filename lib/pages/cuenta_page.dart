@@ -51,21 +51,32 @@ class CuentaPage extends StatelessWidget {
         anchoMaximo: 760,
         arriba: 26,
         children: [
-          Text(
-            'Bienvenida',
-            style: TinaTipografia.serif(tamano: 30, color: TinaColores.rojo),
-          ),
-          Text(
-            nombre,
-            key: const ValueKey('cuenta-nombre'),
-            style: TinaTipografia.estilo(
-              tamano: 34,
-              peso: FontWeight.w800,
-              espaciado: -1,
-              altura: 1,
+          TinaEncabezadoMarca(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Bienvenida',
+                  style: TinaTipografia.serif(
+                    tamano: 32,
+                    color: TinaColores.blanco,
+                  ),
+                ),
+                Text(
+                  nombre,
+                  key: const ValueKey('cuenta-nombre'),
+                  style: TinaTipografia.estilo(
+                    tamano: 42,
+                    peso: FontWeight.w800,
+                    color: TinaColores.blanco,
+                    espaciado: -1.8,
+                    altura: 0.98,
+                  ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 12),
           Text(
             correo,
             style: TinaTipografia.estilo(tamano: 14, color: TinaColores.marron),

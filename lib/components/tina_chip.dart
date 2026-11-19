@@ -42,10 +42,6 @@ class TinaChip extends StatelessWidget {
               decoration: BoxDecoration(
                 color: activo ? TinaColores.tinta : TinaColores.cremaCampo,
                 borderRadius: BorderRadius.circular(999),
-                border: Border.all(
-                  color: activo ? TinaColores.tinta : TinaColores.dorado,
-                  width: 1.5,
-                ),
               ),
               child: Center(
                 widthFactor: 1,

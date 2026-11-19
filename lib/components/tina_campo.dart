@@ -103,15 +103,12 @@ class _TinaCampoState extends State<TinaCampo> {
               ),
               errorText: widget.textoError,
               filled: true,
-              fillColor: TinaColores.cremaCampo,
+              fillColor: _encima ? TinaColores.campoHover : TinaColores.campo,
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: 16,
                 vertical: 15,
               ),
-              enabledBorder: _borde(
-                _encima ? TinaColores.naranja : TinaColores.dorado,
-                1.5,
-              ),
+              enabledBorder: _borde(Colors.transparent, 0),
               focusedBorder: _borde(TinaColores.naranja, 2),
               errorBorder: _borde(TinaColores.rojo, 1.5),
               focusedErrorBorder: _borde(TinaColores.rojo, 2),

@@ -37,12 +37,7 @@ class TinaBarraSuperior extends StatelessWidget implements PreferredSizeWidget {
     return Container(
       height: 64,
       padding: const EdgeInsets.symmetric(horizontal: 14),
-      decoration: const BoxDecoration(
-        color: TinaColores.cremaBarra,
-        border: Border(
-          bottom: BorderSide(color: TinaColores.dorado, width: 1.5),
-        ),
-      ),
+      decoration: const BoxDecoration(color: TinaColores.cremaBarra),
       child: Row(
         children: [
           SizedBox(

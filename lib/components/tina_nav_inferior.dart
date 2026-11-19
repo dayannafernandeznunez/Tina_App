@@ -30,10 +30,7 @@ class TinaNavInferior extends StatelessWidget {
     return Container(
       height: 78,
       padding: const EdgeInsets.fromLTRB(8, 6, 8, 14),
-      decoration: const BoxDecoration(
-        color: TinaColores.cremaBarra,
-        border: Border(top: BorderSide(color: TinaColores.dorado, width: 1.5)),
-      ),
+      decoration: const BoxDecoration(color: TinaColores.cremaBarra),
       child: Row(
         children: [
           for (final entrada in _destinos.entries)

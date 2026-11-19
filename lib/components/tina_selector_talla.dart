@@ -71,12 +71,6 @@ class TinaSelectorTalla extends StatelessWidget {
                               ? TinaColores.tinta
                               : TinaColores.cremaCampo,
                           borderRadius: BorderRadius.circular(14),
-                          border: Border.all(
-                            color: talla == valor
-                                ? TinaColores.tinta
-                                : TinaColores.dorado,
-                            width: 1.5,
-                          ),
                         ),
                         child: Center(
                           widthFactor: 1,

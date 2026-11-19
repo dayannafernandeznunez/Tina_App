@@ -37,12 +37,8 @@ class TinaBotonRedondo extends StatelessWidget {
               width: 44,
               height: 44,
               decoration: BoxDecoration(
-                color: TinaColores.cremaCampo,
+                color: encima ? TinaColores.campoHover : TinaColores.campo,
                 shape: BoxShape.circle,
-                border: Border.all(
-                  color: encima ? TinaColores.naranja : TinaColores.dorado,
-                  width: 1.5,
-                ),
               ),
               child: AnimatedSlide(
                 duration: const Duration(milliseconds: 160),

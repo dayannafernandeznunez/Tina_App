@@ -31,7 +31,6 @@ class TinaSelectorCantidad extends StatelessWidget {
       decoration: BoxDecoration(
         color: TinaColores.cremaCampo,
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: TinaColores.dorado, width: 1.5),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
