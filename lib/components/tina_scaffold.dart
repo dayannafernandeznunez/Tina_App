@@ -4,6 +4,7 @@ import '../utils/adaptable.dart';
 import 'tina_barra_accion.dart';
 import 'tina_barra_escritorio.dart';
 import 'tina_barra_superior.dart';
+import 'tina_fondo_marca.dart';
 import 'tina_nav_inferior.dart';
 
 /// Marco común de las pantallas. Elige solo entre el diseño de celular (barra
@@ -27,6 +28,7 @@ class TinaScaffold extends StatelessWidget {
     this.onCarrito,
     this.onLogo,
     this.accion,
+    this.conFondo = true,
   });
 
   final Widget cuerpo;
@@ -40,6 +42,13 @@ class TinaScaffold extends StatelessWidget {
   final VoidCallback? onCarrito;
   final VoidCallback? onLogo;
   final Widget? accion;
+
+  /// Pone detrás de la pantalla el fondo de la marca (naranja con manchas
+  /// rosadas, estrellas y grano), muy suave para que no estorbe al contenido.
+  final bool conFondo;
+
+  /// Qué tan fuerte se ve el fondo de la marca detrás del contenido (0 a 1).
+  static const double opacidadFondo = 0.28;
 
   @override
   Widget build(BuildContext context) {
@@ -78,7 +87,28 @@ class TinaScaffold extends StatelessWidget {
               onCarrito: onCarrito,
               onLogo: onLogo,
             ),
-      body: cuerpo,
+      body: conFondo
+          ? Stack(
+              fit: StackFit.expand,
+              children: [
+                const Positioned.fill(
+                  child: IgnorePointer(
+                    child: RepaintBoundary(
+                      child: Opacity(
+                        opacity: opacidadFondo,
+                        child: TinaFondoMarca(
+                          radio: 0,
+                          variante: VarianteFondo.completo,
+                          child: SizedBox.expand(),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                cuerpo,
+              ],
+            )
+          : cuerpo,
       bottomNavigationBar: inferior,
     );
   }
