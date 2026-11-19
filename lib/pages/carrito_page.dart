@@ -22,6 +22,7 @@ class CarritoPage extends StatelessWidget {
     required this.onAtras,
     required this.onLogo,
     required this.onNav,
+    this.fotos = const {},
   });
 
   final ResumenCarrito resumen;
@@ -37,6 +38,9 @@ class CarritoPage extends StatelessWidget {
   final VoidCallback onAtras;
   final VoidCallback onLogo;
   final ValueChanged<DestinoNav> onNav;
+
+  /// Foto principal de cada producto (id del producto -> dirección).
+  final Map<int, String> fotos;
 
   @override
   Widget build(BuildContext context) {
@@ -79,6 +83,7 @@ class CarritoPage extends StatelessWidget {
                           total: formatoPesos(linea.total),
                           onCantidad: (n) => onCantidad(linea.item.idItem, n),
                           onQuitar: () => onQuitar(linea.item.idItem),
+                          foto: fotos[linea.producto.idProducto],
                         ),
                     ],
                   ),

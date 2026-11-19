@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../theme/tina_tema.dart';
 import 'tina_hover.dart';
+import 'tina_imagen_red.dart';
 import 'tina_selector_cantidad.dart';
 
 /// Una línea del carrito: muestra del color, nombre, variante, cantidad
@@ -17,6 +18,7 @@ class TinaItemCarrito extends StatelessWidget {
     required this.total,
     required this.onCantidad,
     required this.onQuitar,
+    this.foto,
   });
 
   final String nombre;
@@ -27,6 +29,10 @@ class TinaItemCarrito extends StatelessWidget {
   final String total;
   final ValueChanged<int> onCantidad;
   final VoidCallback onQuitar;
+
+  /// Dirección de la foto principal del producto. Sin foto se ve el degradado
+  /// de marca con una muestra del color elegido.
+  final String? foto;
 
   @override
   Widget build(BuildContext context) {
@@ -57,17 +63,19 @@ class TinaItemCarrito extends StatelessWidget {
                 stops: [0, 0.55, 1],
               ),
             ),
-            child: Center(
-              child: Container(
-                width: 26,
-                height: 26,
-                decoration: BoxDecoration(
-                  color: color,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: TinaColores.crema, width: 2),
-                ),
-              ),
-            ),
+            child: foto != null
+                ? TinaImagenRed(url: foto!, radio: 16)
+                : Center(
+                    child: Container(
+                      width: 26,
+                      height: 26,
+                      decoration: BoxDecoration(
+                        color: color,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: TinaColores.crema, width: 2),
+                      ),
+                    ),
+                  ),
           ),
           Expanded(
             child: Column(

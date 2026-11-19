@@ -272,6 +272,38 @@ void main() {
     });
   });
 
+  group('TinaItemCarrito', () {
+    Widget linea({String? foto}) => TinaItemCarrito(
+      nombre: 'Aretes de porcelanicrón',
+      variante: 'Nude',
+      color: const Color(0xFFE6C3A5),
+      cantidad: 1,
+      maximo: 10,
+      total: r'$18.000',
+      foto: foto,
+      onCantidad: (_) {},
+      onQuitar: () {},
+    );
+
+    testWidgets('muestra la foto del producto cuando la tiene', (tester) async {
+      await tester.pumpWidget(
+        _envolver(linea(foto: 'https://fotos.test/a.jpg')),
+      );
+
+      expect(find.byType(TinaImagenRed), findsOneWidget);
+      expect(find.text('Aretes de porcelanicrón'), findsOneWidget);
+    });
+
+    testWidgets('sin foto deja el degradado con la muestra del color', (
+      tester,
+    ) async {
+      await tester.pumpWidget(_envolver(linea()));
+
+      expect(find.byType(TinaImagenRed), findsNothing);
+      expect(find.text('Nude'), findsOneWidget);
+    });
+  });
+
   group('Selectores', () {
     testWidgets('color: avisa el nombre elegido y marca el actual', (
       tester,
