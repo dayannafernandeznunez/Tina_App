@@ -8,3 +8,9 @@ Future<void> abrirEnLaMismaPestana(String url) async {
   final abrio = await launchUrl(Uri.parse(url), webOnlyWindowName: '_self');
   if (!abrio) throw StateError('No se pudo abrir $url');
 }
+
+/// Abre una dirección en una pestaña nueva (WhatsApp, redes sociales): la
+/// tienda se queda abierta donde estaba.
+Future<void> abrirEnPestanaNueva(String url) async {
+  await launchUrl(Uri.parse(url), webOnlyWindowName: '_blank');
+}

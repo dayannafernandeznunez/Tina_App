@@ -15,7 +15,11 @@ class TinaHero extends StatelessWidget {
     required this.linea2,
     required this.subtitulo,
     this.foto,
+    this.onComprar,
   });
+
+  /// Si se da, la portada muestra el botón "Comprar ahora".
+  final VoidCallback? onComprar;
 
   /// Foto de la portada que sube la administradora. Sin ella se ve el diseño
   /// de manchas y estrellas.
@@ -98,7 +102,43 @@ class TinaHero extends StatelessWidget {
                       ),
                     ),
                   ),
-                  SizedBox(height: grande ? 36 : 28),
+                  if (onComprar != null) ...[
+                    SizedBox(height: grande ? 28 : 20),
+                    GestureDetector(
+                      key: const ValueKey('hero-comprar'),
+                      onTap: onComprar,
+                      child: Container(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: grande ? 30 : 24,
+                          vertical: grande ? 15 : 12,
+                        ),
+                        decoration: BoxDecoration(
+                          color: TinaColores.blanco,
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          spacing: 8,
+                          children: [
+                            Text(
+                              'Comprar ahora',
+                              style: TinaTipografia.estilo(
+                                tamano: grande ? 16 : 14,
+                                peso: FontWeight.w800,
+                                color: TinaColores.naranja,
+                              ),
+                            ),
+                            const Icon(
+                              Icons.arrow_forward_rounded,
+                              size: 18,
+                              color: TinaColores.naranja,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                  SizedBox(height: grande ? 30 : 22),
                   Text(
                     'Tina',
                     style: TinaTipografia.estilo(

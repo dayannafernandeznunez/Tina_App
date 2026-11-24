@@ -10,6 +10,7 @@ import '../data/sesion.dart';
 import '../data/datos_simulados.dart';
 import '../logic/calculos.dart';
 import '../logic/borrador_producto.dart';
+import '../logic/filtros_catalogo.dart';
 import '../logic/metricas.dart';
 import '../logic/validaciones.dart';
 import '../logic/vistas.dart';
@@ -157,6 +158,10 @@ class _TinaScreenState extends State<TinaScreen> {
 
   // ------------------------------------------------- estado de pantallas
   String? _categoriaActiva; // null = todas
+
+  // Filtros y orden del catálogo, y si el panel está abierto (en celular).
+  FiltrosCatalogo _filtros = const FiltrosCatalogo();
+  bool _filtrosVisibles = false;
   int _idProducto = 1;
   String _color = '';
   String _talla = '';
@@ -227,6 +232,21 @@ class _TinaScreenState extends State<TinaScreen> {
   List<String> get _nombresCategorias => [
     for (final c in _categorias) c.nombre,
   ];
+
+  /// Las categorías con la foto de uno de sus productos, para los círculos.
+  List<ItemCategoria> get _itemsCategorias {
+    final vistas = _vistas();
+    return [
+      for (final c in _categorias)
+        ItemCategoria(
+          nombre: c.nombre,
+          foto: vistas
+              .where((v) => v.categoria == c.nombre && v.fotos.isNotEmpty)
+              .map((v) => v.fotos.first)
+              .firstOrNull,
+        ),
+    ];
+  }
 
   ProductoVista _vista(Producto p) {
     final todas = [
@@ -949,6 +969,8 @@ class _TinaScreenState extends State<TinaScreen> {
 
   void _irInicio() {
     _categoriaActiva = null;
+    _filtros = const FiltrosCatalogo();
+    _filtrosVisibles = false;
     _raiz(Ruta.inicio);
   }
 
@@ -977,6 +999,11 @@ class _TinaScreenState extends State<TinaScreen> {
     if (categoria == null) {
       _irInicio();
     } else {
+      // Cada categoría empieza sin filtros.
+      if (categoria != _categoriaActiva) {
+        _filtros = const FiltrosCatalogo();
+        _filtrosVisibles = false;
+      }
       _categoriaActiva = categoria;
       _raiz(Ruta.lista);
     }
@@ -1851,10 +1878,18 @@ class _TinaScreenState extends State<TinaScreen> {
       Ruta.lista => ListaPage(
         onLogo: _irInicio,
         categoriaActiva: _categoriaActiva ?? _categorias.first.nombre,
-        categorias: _nombresCategorias,
-        productos: _vistas(
+        categorias: _itemsCategorias,
+        productos: _filtros.aplicar(
+          _vistas(categoria: _categoriaActiva ?? _categorias.first.nombre),
+        ),
+        todosDeLaCategoria: _vistas(
           categoria: _categoriaActiva ?? _categorias.first.nombre,
         ),
+        filtros: _filtros,
+        filtrosVisibles: _filtrosVisibles,
+        onFiltros: (f) => setState(() => _filtros = f),
+        onAlternarFiltros: () =>
+            setState(() => _filtrosVisibles = !_filtrosVisibles),
         unidadesCarrito: _unidades,
         onProducto: _abrirProducto,
         onCategoria: _onCategoria,
@@ -1864,6 +1899,8 @@ class _TinaScreenState extends State<TinaScreen> {
       ),
       Ruta.detalle => DetallePage(
         onNav: _onNav,
+        onInicio: _irInicio,
+        onCategoria: _onCategoria,
         vista: _vistaDetalle,
         promociones: _promociones,
         color: _color,

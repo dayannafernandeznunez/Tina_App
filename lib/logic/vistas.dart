@@ -51,6 +51,15 @@ class ProductoVista {
 
   int stockDe(String color, String talla) => variante(color, talla)?.stock ?? 0;
 
+  /// Unidades que quedan, sumando todos los colores y tallas.
+  int get stockTotal => variantes.fold(0, (s, v) => s + v.stock);
+
+  /// No queda nada de ninguna variante.
+  bool get agotado => variantes.isNotEmpty && stockTotal == 0;
+
+  /// Quedan pocas unidades en total (pero no está agotado).
+  bool get pocasUnidades => !agotado && stockTotal > 0 && stockTotal <= 3;
+
   /// Lo que queda de cada color, sumando sus tallas, en el orden de [colores].
   Map<String, int> get stockPorColor => {
     for (final c in colores)

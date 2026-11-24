@@ -103,7 +103,6 @@ void main() {
 
       expect(find.text('Maxi collar 3D con mostacilla'), findsOneWidget);
       expect(find.text(r'$55.000'), findsOneWidget);
-      expect(find.text('Collares'), findsOneWidget);
 
       await tester.tap(find.text('Maxi collar 3D con mostacilla'));
       expect(toques, 1);

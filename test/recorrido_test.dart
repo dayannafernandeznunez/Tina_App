@@ -6,7 +6,7 @@ import 'package:tina_app/theme/tina_tema.dart';
 
 Future<void> _abrirApp(WidgetTester tester) async {
   TinaTipografia.usarFuenteWeb = false;
-  tester.view.physicalSize = const Size(450, 2600);
+  tester.view.physicalSize = const Size(450, 5200);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
 
@@ -17,6 +17,16 @@ Future<void> _abrirApp(WidgetTester tester) async {
 }
 
 Future<void> _tocar(WidgetTester tester, Finder finder) async {
+  // La portada es larga y la lista construye solo lo que se ve: si lo que se
+  // busca todavía no está, se baja hasta encontrarlo.
+  if (finder.evaluate().isEmpty) {
+    await tester.scrollUntilVisible(
+      finder,
+      300,
+      scrollable: find.byType(Scrollable).first,
+      maxScrolls: 80,
+    );
+  }
   await tester.ensureVisible(finder);
   await tester.tap(finder, warnIfMissed: true);
   await tester.pumpAndSettle();
@@ -62,9 +72,21 @@ void main() {
       await _abrirApp(tester);
 
       expect(find.text('Tan latinas'), findsOneWidget);
-      expect(find.text('Maxi collar 3D con mostacilla'), findsOneWidget);
-      expect(find.text('Imán de porcelanicrón sol'), findsOneWidget);
       expect(_llave('chip-Pulseras'), findsOneWidget);
+      // Cada producto aparece en la sección de su categoría; la portada es
+      // larga, así que se baja hasta verlos.
+      for (final nombre in [
+        'Maxi collar 3D con mostacilla',
+        'Imán de porcelanicrón sol',
+      ]) {
+        await tester.scrollUntilVisible(
+          find.text(nombre),
+          300,
+          scrollable: find.byType(Scrollable).first,
+          maxScrolls: 80,
+        );
+        expect(find.text(nombre), findsOneWidget);
+      }
     });
 
     testWidgets('una categoría filtra la lista y "Todos" vuelve a la portada', (

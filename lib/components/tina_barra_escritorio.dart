@@ -87,16 +87,36 @@ class TinaBarraEscritorio extends StatelessWidget
                   ),
                 ],
                 const Spacer(),
-                if (onNav != null)
-                  for (final entrada in _etiquetas.entries)
+                if (onNav != null) ...[
+                  for (final destino in const [
+                    DestinoNav.inicio,
+                    DestinoNav.categorias,
+                  ])
                     _Enlace(
-                      key: ValueKey('nav-${entrada.key.name}'),
-                      etiqueta: entrada.value,
-                      activo: entrada.key == activo,
-                      insignia: entrada.key == DestinoNav.carrito ? carrito : 0,
-                      onTap: () => onNav!(entrada.key),
-                    )
-                else if (conCarrito)
+                      key: ValueKey('nav-${destino.name}'),
+                      etiqueta: _etiquetas[destino]!,
+                      activo: destino == activo,
+                      insignia: 0,
+                      onTap: () => onNav!(destino),
+                    ),
+                  const SizedBox(width: 12),
+                  _IconoNav(
+                    key: const ValueKey('nav-cuenta'),
+                    etiqueta: 'Cuenta',
+                    icono: Icons.person_outline_rounded,
+                    activo: activo == DestinoNav.cuenta,
+                    insignia: 0,
+                    onTap: () => onNav!(DestinoNav.cuenta),
+                  ),
+                  _IconoNav(
+                    key: const ValueKey('nav-carrito'),
+                    etiqueta: 'Carrito',
+                    icono: Icons.shopping_bag_outlined,
+                    activo: activo == DestinoNav.carrito,
+                    insignia: carrito,
+                    onTap: () => onNav!(DestinoNav.carrito),
+                  ),
+                ] else if (conCarrito)
                   TinaCarritoRedondo(carrito: carrito, onCarrito: onCarrito),
               ],
             ),
@@ -183,6 +203,95 @@ class _Enlace extends StatelessWidget {
                     ),
                 ],
               ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Ícono de la cabecera (cuenta, carrito) con su número si lo hay.
+class _IconoNav extends StatelessWidget {
+  const _IconoNav({
+    super.key,
+    required this.etiqueta,
+    required this.icono,
+    required this.activo,
+    required this.insignia,
+    required this.onTap,
+  });
+
+  final String etiqueta;
+  final IconData icono;
+  final bool activo;
+  final int insignia;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      selected: activo,
+      label: insignia > 0 ? '$etiqueta, $insignia' : etiqueta,
+      excludeSemantics: true,
+      onTap: onTap,
+      child: TinaHover(
+        builder: (context, encima) => GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: onTap,
+          child: Container(
+            width: 46,
+            height: 46,
+            margin: const EdgeInsets.only(left: 4),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: activo
+                  ? TinaColores.melocoton
+                  : encima
+                  ? TinaColores.cremaSuave
+                  : Colors.transparent,
+            ),
+            child: Stack(
+              alignment: Alignment.center,
+              clipBehavior: Clip.none,
+              children: [
+                Icon(
+                  icono,
+                  size: 25,
+                  color: (activo || encima)
+                      ? TinaColores.naranja
+                      : TinaColores.tinta,
+                ),
+                if (insignia > 0)
+                  Positioned(
+                    right: 2,
+                    top: 2,
+                    child: Container(
+                      constraints: const BoxConstraints(
+                        minWidth: 19,
+                        minHeight: 19,
+                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 5),
+                      decoration: BoxDecoration(
+                        color: TinaColores.rojo,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Center(
+                        widthFactor: 1,
+                        heightFactor: 1,
+                        child: Text(
+                          '$insignia',
+                          style: TinaTipografia.estilo(
+                            tamano: 11,
+                            peso: FontWeight.w800,
+                            color: TinaColores.blanco,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ),
         ),

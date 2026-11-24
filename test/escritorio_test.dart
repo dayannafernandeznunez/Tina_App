@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tina_app/components/components.dart';
+import 'package:tina_app/logic/vistas.dart';
+import 'package:tina_app/models/models.dart';
 import 'package:tina_app/screens/tina_screen.dart';
 import 'package:tina_app/theme/tina_tema.dart';
 
@@ -54,7 +56,48 @@ void main() {
     );
 
     testWidgets('la grilla de productos tiene 4 columnas', (tester) async {
-      await _abrirApp(tester);
+      TinaTipografia.usarFuenteWeb = false;
+      tester.view.physicalSize = const Size(1400, 2400);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+
+      final productos = [
+        for (var i = 1; i <= 5; i++)
+          ProductoVista(
+            producto: Producto(
+              idProducto: i,
+              idCategoria: 1,
+              nombre: 'Producto $i',
+              descripcion: '',
+              tecnica: '',
+              precio: 10000,
+            ),
+            categoria: 'Collares',
+            variantes: [
+              VarianteProducto(
+                idVariante: i,
+                idProducto: i,
+                color: 'Naranja',
+                talla: 'Única',
+                stock: 5,
+              ),
+            ],
+          ),
+      ];
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: TinaTema.crear(),
+          home: Scaffold(
+            body: Padding(
+              padding: const EdgeInsets.all(24),
+              child: TinaGrillaProductos(
+                productos: productos,
+                onProducto: (_) {},
+              ),
+            ),
+          ),
+        ),
+      );
 
       final y = [
         for (final id in [1, 2, 3, 4, 5])
@@ -68,6 +111,18 @@ void main() {
         greaterThan(y[0]),
         reason: 'el quinto baja a la segunda fila',
       );
+    });
+
+    testWidgets('la portada pone los productos de cada categoría en su fila', (
+      tester,
+    ) async {
+      await _abrirApp(tester);
+
+      // Los de una misma categoría comparten fila y quedan uno al lado del otro.
+      final x1 = tester.getTopLeft(_llave('producto-1'));
+      final x2 = tester.getTopLeft(_llave('producto-2'));
+      expect(x1.dy, x2.dy);
+      expect(x2.dx, greaterThan(x1.dx));
     });
 
     testWidgets('los enlaces de la barra recorren las secciones', (
