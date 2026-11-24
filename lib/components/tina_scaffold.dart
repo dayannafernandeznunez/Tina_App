@@ -80,7 +80,10 @@ class TinaScaffold extends StatelessWidget {
 
     final PreferredSizeWidget cabecera = escritorio
         ? TinaBarraEscritorio(
-            titulo: titulo,
+            // En las pantallas de la tienda la página ya tiene su título
+            // grande; repetirlo en la cabecera aprieta los enlaces.
+            titulo: conPromo ? null : titulo,
+            paginaActual: titulo,
             conAtras: conAtras,
             conCarrito: conCarrito,
             carrito: unidadesCarrito,

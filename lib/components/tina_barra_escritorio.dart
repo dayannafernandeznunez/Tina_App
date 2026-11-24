@@ -26,10 +26,14 @@ class TinaBarraEscritorio extends StatelessWidget
     this.onLogo,
     this.onCarrito,
     this.enlaces = const EnlacesTienda(),
+    this.paginaActual,
   });
 
   /// Charm Bar, colecciones y buscador (los que no tengan destino no se ven).
   final EnlacesTienda enlaces;
+
+  /// El nombre de la página que se está viendo, para marcar su enlace.
+  final String? paginaActual;
 
   final String? titulo;
   final bool conAtras;
@@ -46,6 +50,13 @@ class TinaBarraEscritorio extends StatelessWidget
     DestinoNav.categorias: 'Categorías',
     DestinoNav.carrito: 'Carrito',
     DestinoNav.cuenta: 'Cuenta',
+  };
+
+  /// Páginas que tienen su propio enlace: ahí "Categorías" no se marca.
+  static const Set<String> _paginasPropias = {
+    'Charm Bar',
+    'Colecciones',
+    'Buscar',
   };
 
   @override
@@ -109,7 +120,9 @@ class TinaBarraEscritorio extends StatelessWidget
                             _Enlace(
                               key: ValueKey('nav-${destino.name}'),
                               etiqueta: _etiquetas[destino]!,
-                              activo: destino == activo,
+                              activo:
+                                  destino == activo &&
+                                  !_paginasPropias.contains(paginaActual),
                               insignia: 0,
                               onTap: () => onNav!(destino),
                             ),
@@ -117,7 +130,7 @@ class TinaBarraEscritorio extends StatelessWidget
                             _Enlace(
                               key: const ValueKey('nav-charmbar'),
                               etiqueta: 'Charm Bar',
-                              activo: titulo == 'Charm Bar',
+                              activo: paginaActual == 'Charm Bar',
                               insignia: 0,
                               onTap: enlaces.onCharmBar!,
                             ),
@@ -125,7 +138,7 @@ class TinaBarraEscritorio extends StatelessWidget
                             _Enlace(
                               key: const ValueKey('nav-colecciones'),
                               etiqueta: 'Colecciones',
-                              activo: false,
+                              activo: paginaActual == 'Colecciones',
                               insignia: 0,
                               onTap: enlaces.onColecciones!,
                             ),
