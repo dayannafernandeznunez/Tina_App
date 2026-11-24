@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../components/components.dart';
+import '../logic/charm_bar.dart';
 import '../logic/vistas.dart';
 import '../models/models.dart';
 import '../theme/tina_tema.dart';
@@ -20,7 +21,21 @@ class InicioPage extends StatelessWidget {
     required this.onLogo,
     required this.onNav,
     this.fotoPortada,
+    this.fotoBannerCharmBar,
+    this.colecciones = const [],
+    this.onColeccion,
+    this.enlaces = const EnlacesTienda(),
   });
+
+  /// Las colecciones visibles (con su foto) y a dónde lleva cada una.
+  final List<ItemCategoria> colecciones;
+  final ValueChanged<String>? onColeccion;
+
+  /// Foto del banner "Arma tu collar" (la sube la administradora).
+  final String? fotoBannerCharmBar;
+
+  /// El Charm Bar, las colecciones y el buscador.
+  final EnlacesTienda enlaces;
 
   /// Foto de la portada que sube la administradora (puede no haber ninguna).
   final String? fotoPortada;
@@ -52,14 +67,17 @@ class InicioPage extends StatelessWidget {
               .firstOrNull,
         ),
     ];
+    // El collar base del Charm Bar no se vende suelto: tiene su propio armador.
     final secciones = [
       for (final c in categorias)
-        (c, productos.where((p) => p.categoria == c && p.producto.activo)),
+        if (c != CharmBar.categoriaBase)
+          (c, productos.where((p) => p.categoria == c && p.producto.activo)),
     ].where((s) => s.$2.isNotEmpty).toList();
 
     return TinaScaffold(
       activo: DestinoNav.inicio,
       conPromo: true,
+      enlaces: enlaces,
       unidadesCarrito: unidadesCarrito,
       onNav: onNav,
       onCarrito: onCarrito,
@@ -126,6 +144,27 @@ class InicioPage extends StatelessWidget {
               ),
             ],
           ],
+          if (colecciones.isNotEmpty && onColeccion != null) ...[
+            const SizedBox(height: 46),
+            TinaTituloSeccion(
+              titulo: 'Colecciones',
+              subtitulo: 'Piezas que van juntas',
+              key: const ValueKey('titulo-colecciones'),
+            ),
+            const SizedBox(height: 18),
+            TinaMosaicoCategorias(
+              key: const ValueKey('mosaico-colecciones'),
+              categorias: colecciones,
+              onTap: onColeccion!,
+            ),
+          ],
+          if (enlaces.onCharmBar != null) ...[
+            const SizedBox(height: 46),
+            _BannerCharmBar(
+              foto: fotoBannerCharmBar,
+              onTap: enlaces.onCharmBar!,
+            ),
+          ],
           if (promociones.any((p) => p.activa)) ...[
             const SizedBox(height: 46),
             const TinaTituloSeccion(titulo: 'Beneficios Tina'),
@@ -151,6 +190,7 @@ class InicioPage extends StatelessWidget {
             categorias: categorias,
             onCategoria: onCategoria,
             onLogo: onLogo,
+            enlaces: enlaces,
           ),
         ],
       ),
@@ -191,6 +231,93 @@ class _VerMas extends StatelessWidget {
               ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// El banner grande "Arma tu collar": foto de la administradora o, mientras no
+/// la haya, el diseño de marca. Lleva al Charm Bar.
+class _BannerCharmBar extends StatelessWidget {
+  const _BannerCharmBar({required this.onTap, this.foto});
+
+  final String? foto;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final contenido = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      spacing: 6,
+      children: [
+        Text(
+          'ARMA TU COLLAR',
+          style: TinaTipografia.estilo(
+            tamano: 13,
+            peso: FontWeight.w800,
+            color: TinaColores.blanco,
+            espaciado: 1.4,
+          ),
+        ),
+        Text(
+          'Charm Bar',
+          style: TinaTipografia.estilo(
+            tamano: 36,
+            peso: FontWeight.w800,
+            color: TinaColores.blanco,
+            espaciado: -1.2,
+          ),
+        ),
+        Text(
+          'Elige el collar, elige tus charms y hazlo único.',
+          style: TinaTipografia.serif(tamano: 20, color: TinaColores.blanco),
+        ),
+        const SizedBox(height: 10),
+        GestureDetector(
+          key: const ValueKey('banner-charm-bar'),
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 26, vertical: 13),
+            decoration: BoxDecoration(
+              color: TinaColores.blanco,
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: Text(
+              'Quiero ver más',
+              style: TinaTipografia.estilo(
+                tamano: 15,
+                peso: FontWeight.w800,
+                color: TinaColores.naranja,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+    if (foto == null) {
+      return TinaEncabezadoMarca(child: contenido);
+    }
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(32),
+      child: AspectRatio(
+        aspectRatio: 2.4,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            TinaImagenRed(url: foto!, radio: 0),
+            const DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Color(0xCC2A1608), Color(0x002A1608)],
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(28),
+              child: Align(alignment: Alignment.bottomLeft, child: contenido),
+            ),
+          ],
         ),
       ),
     );

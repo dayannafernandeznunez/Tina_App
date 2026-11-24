@@ -8,7 +8,11 @@ class ProductoVista {
     required this.variantes,
     this.fotos = const [],
     this.fotosPorColor = const {},
+    this.coleccion,
   });
+
+  /// El nombre de la colección a la que pertenece, si tiene.
+  final String? coleccion;
 
   final Producto producto;
   final String categoria;

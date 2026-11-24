@@ -30,7 +30,10 @@ class DetallePage extends StatelessWidget {
     required this.onAgregar,
     this.onInicio,
     this.onCategoria,
+    this.enlaces = const EnlacesTienda(),
   });
+
+  final EnlacesTienda enlaces;
 
   final ProductoVista vista;
   final List<Promocion> promociones;
@@ -64,6 +67,7 @@ class DetallePage extends StatelessWidget {
     return TinaScaffold(
       conAtras: true,
       conPromo: true,
+      enlaces: enlaces,
       unidadesCarrito: unidadesCarrito,
       onAtras: onAtras,
       onCarrito: onCarrito,

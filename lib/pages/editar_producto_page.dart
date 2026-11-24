@@ -17,6 +17,8 @@ class EditarProductoPage extends StatelessWidget {
     required this.ocupado,
     required this.onCampo,
     required this.onCategoria,
+    this.colecciones = const [],
+    this.onColeccion,
     required this.onVisible,
     required this.onVarianteCampo,
     required this.onVarianteStock,
@@ -42,6 +44,12 @@ class EditarProductoPage extends StatelessWidget {
   /// `campo` es `nombre`, `descripcion`, `tecnica` o `precio`.
   final void Function(String campo, String valor) onCampo;
   final ValueChanged<int> onCategoria;
+
+  /// Las colecciones que se pueden elegir (la opción "Ninguna" siempre está).
+  final List<Coleccion> colecciones;
+
+  /// Elige la colección; 0 significa ninguna.
+  final ValueChanged<int>? onColeccion;
   final ValueChanged<bool> onVisible;
 
   /// `campo` es `color` o `talla`.
@@ -146,6 +154,34 @@ class EditarProductoPage extends StatelessWidget {
               },
             ),
           ),
+          if (onColeccion != null) ...[
+            const SizedBox(height: 16),
+            Text(
+              'Colección (opcional)',
+              style: TinaTipografia.estilo(tamano: 14, peso: FontWeight.w800),
+            ),
+            const SizedBox(height: 6),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: DropdownMenu<int>(
+                key: const ValueKey('prod-coleccion'),
+                initialSelection: borrador.idColeccion,
+                width: 340,
+                textStyle: TinaTipografia.estilo(tamano: 15),
+                dropdownMenuEntries: [
+                  const DropdownMenuEntry<int>(value: 0, label: 'Ninguna'),
+                  for (final c in colecciones)
+                    DropdownMenuEntry<int>(
+                      value: c.idColeccion,
+                      label: c.activa ? c.nombre : '${c.nombre} (oculta)',
+                    ),
+                ],
+                onSelected: (id) {
+                  if (id != null) onColeccion!(id);
+                },
+              ),
+            ),
+          ],
           const SizedBox(height: 18),
           Text(
             '¿Se ve en la tienda?',

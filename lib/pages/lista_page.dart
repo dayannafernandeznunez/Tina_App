@@ -27,8 +27,10 @@ class ListaPage extends StatelessWidget {
     required this.onCarrito,
     required this.onLogo,
     required this.onNav,
+    this.enlaces = const EnlacesTienda(),
   });
 
+  final EnlacesTienda enlaces;
   final String categoriaActiva;
   final List<ItemCategoria> categorias;
 
@@ -118,6 +120,7 @@ class ListaPage extends StatelessWidget {
       titulo: grande ? null : categoriaActiva,
       conAtras: true,
       conPromo: true,
+      enlaces: enlaces,
       activo: DestinoNav.categorias,
       unidadesCarrito: unidadesCarrito,
       onAtras: onAtras,
@@ -208,6 +211,7 @@ class ListaPage extends StatelessWidget {
             categorias: [for (final c in categorias) c.nombre],
             onCategoria: onCategoria,
             onLogo: onLogo,
+            enlaces: enlaces,
           ),
         ],
       ),

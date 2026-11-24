@@ -101,6 +101,24 @@ class _AdminFalsa implements AdministradoraRepositorio {
   }) => throw UnimplementedError();
 
   @override
+  Future<Coleccion> guardarColeccion(Coleccion coleccion) =>
+      throw UnimplementedError();
+
+  @override
+  Future<void> borrarColeccion(Coleccion coleccion) =>
+      throw UnimplementedError();
+
+  @override
+  Future<Coleccion> subirFotoColeccion({
+    required Coleccion coleccion,
+    required FotoElegida foto,
+  }) => throw UnimplementedError();
+
+  @override
+  Future<Coleccion> quitarFotoColeccion(Coleccion coleccion) =>
+      throw UnimplementedError();
+
+  @override
   Future<AjusteSitio> quitarFotoSitio(AjusteSitio ajuste) =>
       throw UnimplementedError();
 }

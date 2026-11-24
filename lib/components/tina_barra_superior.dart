@@ -18,7 +18,11 @@ class TinaBarraSuperior extends StatelessWidget implements PreferredSizeWidget {
     this.onAtras,
     this.onCarrito,
     this.onLogo,
+    this.onBuscar,
   });
+
+  /// Si se da, y no hay botón de volver, la esquina izquierda muestra la lupa.
+  final VoidCallback? onBuscar;
 
   final String? titulo;
   final bool conAtras;
@@ -49,6 +53,14 @@ class TinaBarraSuperior extends StatelessWidget implements PreferredSizeWidget {
                     icono: Icons.chevron_left_rounded,
                     tamanoIcono: 28,
                     onPressed: onAtras,
+                  )
+                : onBuscar != null
+                ? TinaBotonRedondo(
+                    key: const ValueKey('nav-buscar'),
+                    etiqueta: 'Buscar',
+                    icono: Icons.search_rounded,
+                    tamanoIcono: 26,
+                    onPressed: onBuscar,
                   )
                 : null,
           ),

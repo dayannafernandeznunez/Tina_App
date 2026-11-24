@@ -111,6 +111,23 @@ abstract class AdministradoraRepositorio {
   /// Borra una variante. Si ya tiene pedidos no se puede: lanza
   /// [ErrorAdministradora] y conviene dejarla con stock 0.
   Future<void> borrarVariante(int idVariante);
+
+  /// Crea la colección (si su `idColeccion` es 0) o la actualiza. Devuelve la
+  /// colección guardada, con su id.
+  Future<Coleccion> guardarColeccion(Coleccion coleccion);
+
+  /// Borra la colección y su foto. Sus productos no se borran: quedan sin
+  /// colección.
+  Future<void> borrarColeccion(Coleccion coleccion);
+
+  /// Pone o cambia la foto de una colección y devuelve la colección nueva.
+  Future<Coleccion> subirFotoColeccion({
+    required Coleccion coleccion,
+    required FotoElegida foto,
+  });
+
+  /// Quita la foto de una colección.
+  Future<Coleccion> quitarFotoColeccion(Coleccion coleccion);
 }
 
 /// Hace todo lo anterior con Supabase (Auth, base de datos y Storage). Las
@@ -245,6 +262,7 @@ class AdministradoraSupabase implements AdministradoraRepositorio {
       'tecnica': producto.tecnica,
       'precio': producto.precio,
       'activo': producto.activo,
+      'id_coleccion': producto.idColeccion,
     };
     try {
       final fila = producto.idProducto == 0
@@ -291,6 +309,73 @@ class AdministradoraSupabase implements AdministradoraRepositorio {
     } on PostgrestException catch (e) {
       throw _traducir(e, 'No se pudo borrar esa fila.');
     }
+  }
+
+  @override
+  Future<Coleccion> guardarColeccion(Coleccion coleccion) async {
+    final datos = {
+      'nombre': coleccion.nombre,
+      'subtitulo': coleccion.subtitulo,
+      'activa': coleccion.activa,
+      'orden': coleccion.orden,
+    };
+    try {
+      final fila = coleccion.idColeccion == 0
+          ? await _c.from('coleccion').insert(datos).select().single()
+          : await _c
+                .from('coleccion')
+                .update(datos)
+                .eq('id_coleccion', coleccion.idColeccion)
+                .select()
+                .single();
+      return Coleccion.desdeMapa(fila);
+    } on PostgrestException catch (e) {
+      throw _traducir(e, 'No se pudo guardar la colección.');
+    }
+  }
+
+  @override
+  Future<void> borrarColeccion(Coleccion coleccion) async {
+    try {
+      await _c
+          .from('coleccion')
+          .delete()
+          .eq('id_coleccion', coleccion.idColeccion);
+    } on PostgrestException catch (e) {
+      throw _traducir(e, 'No se pudo borrar la colección.');
+    }
+    await _quitarArchivo(_carpetaSitio, coleccion.ruta);
+  }
+
+  @override
+  Future<Coleccion> subirFotoColeccion({
+    required Coleccion coleccion,
+    required FotoElegida foto,
+  }) async {
+    final ruta =
+        'coleccion-${coleccion.idColeccion}/${DateTime.now().millisecondsSinceEpoch}.${foto.extension}';
+    final url = await _subir(_carpetaSitio, ruta, foto);
+    try {
+      await _c
+          .from('coleccion')
+          .update({'url': url, 'ruta': ruta})
+          .eq('id_coleccion', coleccion.idColeccion);
+    } catch (_) {
+      await _quitarArchivo(_carpetaSitio, ruta);
+      rethrow;
+    }
+    await _quitarArchivo(_carpetaSitio, coleccion.ruta);
+    return coleccion.copyWith(url: url, ruta: ruta);
+  }
+
+  @override
+  Future<Coleccion> quitarFotoColeccion(Coleccion coleccion) async {
+    await _c
+        .from('coleccion')
+        .update({'url': null, 'ruta': null})
+        .eq('id_coleccion', coleccion.idColeccion);
+    await _quitarArchivo(_carpetaSitio, coleccion.ruta);
+    return coleccion.copyWith(sinFoto: true);
   }
 
   /// Pasa los errores de la base de datos a un mensaje para la administradora.

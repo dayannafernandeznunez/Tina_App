@@ -33,6 +33,7 @@ for (const f of [
   'migrations/20261118000005_pago_wompi.sql',
   'migrations/20261119000006_fotos_por_color.sql',
   'migrations/20261119000007_aviso_whatsapp.sql',
+  'migrations/20261124000008_charm_bar_y_colecciones.sql',
 ]) {
   try {
     await db.exec(leer(f));
@@ -48,7 +49,7 @@ await db.exec(`
   grant all on all sequences in schema public to anon, authenticated;
   grant select on auth.users to authenticated;
 `);
-console.log('Los 8 scripts corren sin errores.\n');
+console.log('Los 9 scripts corren sin errores.\n');
 
 let ok = 0, mal = 0;
 const igual = (nombre, real, esperado) => {
@@ -322,6 +323,36 @@ r = await pedir([{ id_variante: 6, cantidad: 1 }], 'contraentrega', envio('Cali'
 await db.query('update pedido set estado_actual = $2 where id_pedido = $1', [r.id_pedido, 'cancelado']);
 igual('un pedido cancelado no se avisa', await reclamar(r.id_pedido), null);
 
+
+// ---- Charm Bar, colecciones y suscripción.
+console.log('\n--- Charm Bar, colecciones y suscripción');
+await como(null);
+await db.exec('set role anon');
+igual('una visitante ve las categorías Charm Bar y Charms', (await q("select nombre from categoria where nombre in ('Charm Bar','Charms') order by nombre")).map((c) => c.nombre), ['Charm Bar', 'Charms']);
+igual('el collar base y los charms de ejemplo están ocultos para ella', (await q("select count(*)::int n from producto where id_categoria in (select id_categoria from categoria where nombre in ('Charm Bar','Charms'))"))[0].n, 0);
+await db.exec('reset role');
+igual('el collar base trae sus colores y modos (8 variantes)', (await q("select count(*)::int n from variante_producto v join producto p using (id_producto) join categoria c using (id_categoria) where c.nombre = 'Charm Bar'"))[0].n, 8);
+igual('y hay 8 charms de ejemplo, sin stock', (await q("select count(*)::int n, coalesce(sum(v.stock),0)::int s from variante_producto v join producto p using (id_producto) join categoria c using (id_categoria) where c.nombre = 'Charms'"))[0], { n: 8, s: 0 });
+await como(ADMIN);
+await db.query("insert into coleccion (nombre, subtitulo, activa) values ('Feria', 'Piezas de la feria', true), ('Borrador', '', false)");
+await como(null);
+await db.exec('set role anon');
+igual('una visitante ve solo las colecciones activas', (await q('select nombre from coleccion order by nombre')).map((c) => c.nombre), ['Feria']);
+await falla('una visitante no puede crear colecciones', "insert into coleccion (nombre) values ('Mía')", [], '');
+await db.exec('reset role');
+await como(ADMIN);
+await db.query("update producto set id_coleccion = (select id_coleccion from coleccion where nombre = 'Feria') where id_producto = 1");
+await db.query("delete from coleccion where nombre = 'Feria'");
+igual('al borrar una colección sus productos quedan sin colección', (await q('select id_coleccion from producto where id_producto = 1'))[0].id_coleccion, null);
+await como(null);
+await db.exec('set role anon');
+await db.query("select public.suscribirse('  Laura@Correo.com ')");
+await db.query("select public.suscribirse('laura@correo.com')");
+await falla('un correo inválido no se guarda', "select public.suscribirse('no-es-correo')", [], 'correo válido');
+igual('una visitante no ve la lista de suscripciones (la regla de seguridad la deja vacía)', (await q('select * from suscripcion')).length, 0);
+await db.exec('reset role');
+igual('el mismo correo no se repite y se guarda en minúsculas', (await q('select correo from suscripcion')).map((c) => c.correo), ['laura@correo.com']);
+igual('hay lugares para las fotos del Charm Bar', (await q("select clave from ajuste_sitio where clave like '%charm_bar%' order by clave")).map((c) => c.clave), ['banner_charm_bar', 'charm_bar_portada']);
 
 console.log(`\n${ok} bien, ${mal} mal`);
 process.exit(mal ? 1 : 0);

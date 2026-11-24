@@ -7,6 +7,7 @@ enum SeccionPanel {
   pedidos('Pedidos'),
   datos('Datos cliente'),
   productos('Productos'),
+  colecciones('Colecciones'),
   fotosArticulos('Fotos de artículos'),
   fotosSitio('Fotos del sitio');
 

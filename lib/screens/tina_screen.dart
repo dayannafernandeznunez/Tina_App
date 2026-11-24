@@ -10,12 +10,17 @@ import '../data/sesion.dart';
 import '../data/datos_simulados.dart';
 import '../logic/calculos.dart';
 import '../logic/borrador_producto.dart';
+import '../logic/busqueda.dart';
+import '../logic/charm_bar.dart';
 import '../logic/filtros_catalogo.dart';
 import '../logic/metricas.dart';
 import '../logic/validaciones.dart';
 import '../logic/vistas.dart';
 import '../models/models.dart';
+import '../pages/buscar_page.dart';
 import '../pages/carrito_page.dart';
+import '../pages/colecciones_page.dart';
+import '../pages/charm_bar_page.dart';
 import '../pages/checkout_page.dart';
 import '../pages/editar_producto_page.dart';
 import '../pages/confirmacion_page.dart';
@@ -25,6 +30,7 @@ import '../pages/inicio_page.dart';
 import '../pages/lista_page.dart';
 import '../pages/login_page.dart';
 import '../pages/panel_page.dart';
+import '../pages/panel_colecciones_page.dart';
 import '../pages/panel_datos_page.dart';
 import '../pages/panel_fotos_articulos_page.dart';
 import '../pages/panel_fotos_sitio_page.dart';
@@ -52,6 +58,15 @@ enum Ruta {
 
   /// A donde vuelve la clienta después de la página de pago de Wompi.
   pagoRetorno,
+
+  /// El Charm Bar: armar un collar con charms.
+  charmBar,
+
+  /// El buscador de la tienda.
+  buscar,
+
+  /// Todas las colecciones.
+  colecciones,
 }
 
 /// Screen anfitriona de la app.
@@ -121,6 +136,7 @@ class _TinaScreenState extends State<TinaScreen> {
   List<Promocion> _promociones = [...DatosSimulados.promociones];
   List<ImagenProducto> _imagenes = [];
   List<AjusteSitio> _ajustesSitio = [];
+  List<Coleccion> _colecciones = [];
   List<Usuario> _usuarios = [...DatosSimulados.usuarios];
 
   bool _cargandoCatalogo = false;
@@ -158,6 +174,19 @@ class _TinaScreenState extends State<TinaScreen> {
 
   // ------------------------------------------------- estado de pantallas
   String? _categoriaActiva; // null = todas
+
+  // Formulario de colecciones del panel.
+  String _coleccionNombre = '';
+  String _coleccionSubtitulo = '';
+  int? _coleccionEditando;
+  int? _coleccionPorBorrar;
+
+  // La colección que se está viendo (null = una categoría) y lo que se busca.
+  int? _coleccionActiva;
+  String _consulta = '';
+
+  // Lo que la clienta va eligiendo en el Charm Bar.
+  ArmadoCollar _armado = const ArmadoCollar();
 
   // Filtros y orden del catálogo, y si el panel está abierto (en celular).
   FiltrosCatalogo _filtros = const FiltrosCatalogo();
@@ -233,6 +262,43 @@ class _TinaScreenState extends State<TinaScreen> {
     for (final c in _categorias) c.nombre,
   ];
 
+  /// Las colecciones que se ven en la tienda, con su foto (o la de uno de sus
+  /// productos si no tienen).
+  List<ItemCategoria> get _itemsColecciones {
+    final vistas = _vistas();
+    return [
+      for (final c in _colecciones.where((c) => c.activa))
+        ItemCategoria(
+          nombre: c.nombre,
+          foto: c.tieneFoto
+              ? c.url
+              : vistas
+                    .where((v) => v.producto.idColeccion == c.idColeccion)
+                    .expand((v) => v.fotos.take(1))
+                    .firstOrNull,
+        ),
+    ];
+  }
+
+  /// A dónde llevan el Charm Bar, las colecciones y el buscador.
+  EnlacesTienda get _enlaces => EnlacesTienda(
+    onCharmBar: _abrirCharmBar,
+    onColecciones: _colecciones.any((c) => c.activa) ? _irColecciones : null,
+    onBuscar: _irBuscar,
+  );
+
+  /// Los productos de la lista que se está viendo: una colección o una
+  /// categoría.
+  List<ProductoVista> _productosDeLaLista() {
+    if (_coleccionActiva != null) {
+      return [
+        for (final v in _vistas())
+          if (v.producto.idColeccion == _coleccionActiva) v,
+      ];
+    }
+    return _vistas(categoria: _categoriaActiva ?? _categorias.first.nombre);
+  }
+
   /// Las categorías con la foto de uno de sus productos, para los círculos.
   List<ItemCategoria> get _itemsCategorias {
     final vistas = _vistas();
@@ -274,6 +340,10 @@ class _TinaScreenState extends State<TinaScreen> {
       ],
       fotos: generales.isNotEmpty ? generales : [for (final i in todas) i.url],
       fotosPorColor: porColor,
+      coleccion: _colecciones
+          .where((c) => c.idColeccion == p.idColeccion)
+          .map((c) => c.nombre)
+          .firstOrNull,
     );
   }
 
@@ -362,6 +432,7 @@ class _TinaScreenState extends State<TinaScreen> {
         _promociones = [...catalogo.promociones];
         _imagenes = [...catalogo.imagenes];
         _ajustesSitio = [...catalogo.ajustesSitio];
+        _colecciones = [...catalogo.colecciones];
         _cargandoCatalogo = false;
       });
     } catch (error) {
@@ -374,7 +445,11 @@ class _TinaScreenState extends State<TinaScreen> {
 
   // ------------------------------------------- administradora y sus fotos
   /// Lugares del sitio que la tienda ya muestra.
-  static const Set<String> _clavesSitioEnUso = {'portada_inicio'};
+  static const Set<String> _clavesSitioEnUso = {
+    'portada_inicio',
+    'banner_charm_bar',
+    'charm_bar_portada',
+  };
 
   /// Sin cuentas reales (modo de ejemplo) el panel se abre sin cuenta; con
   /// ellas, solo si quien entró es administradora.
@@ -735,6 +810,145 @@ class _TinaScreenState extends State<TinaScreen> {
     }, exito: borrador.esNuevo ? 'Producto creado.' : 'Cambios guardados.');
   }
 
+  // ------------------------------------------------------------ colecciones
+  void _limpiarFormularioColeccion() {
+    setState(() {
+      _coleccionNombre = '';
+      _coleccionSubtitulo = '';
+      _coleccionEditando = null;
+      _coleccionPorBorrar = null;
+    });
+  }
+
+  void _editarColeccion(int id) {
+    final c = _colecciones.firstWhere((c) => c.idColeccion == id);
+    setState(() {
+      _coleccionEditando = id;
+      _coleccionNombre = c.nombre;
+      _coleccionSubtitulo = c.subtitulo;
+      _coleccionPorBorrar = null;
+    });
+  }
+
+  void _reemplazarColeccion(Coleccion nueva) {
+    setState(() {
+      _colecciones = [
+        for (final c in _colecciones)
+          if (c.idColeccion == nueva.idColeccion) nueva else c,
+      ];
+    });
+  }
+
+  Future<void> _guardarColeccion() async {
+    final nombre = _coleccionNombre.trim();
+    if (nombre.isEmpty) {
+      _aviso('Escribe el nombre de la colección.');
+      return;
+    }
+    if (!_hayAdmin()) return;
+    final editando = _coleccionEditando;
+    await _accionFotos(() async {
+      final admin = widget.admin!;
+      if (editando == null) {
+        final orden =
+            _colecciones.fold(0, (m, c) => c.orden > m ? c.orden : m) + 1;
+        final creada = await admin.guardarColeccion(
+          Coleccion(
+            idColeccion: 0,
+            nombre: nombre,
+            subtitulo: _coleccionSubtitulo.trim(),
+            orden: orden,
+          ),
+        );
+        if (!mounted) return;
+        setState(() => _colecciones = [..._colecciones, creada]);
+      } else {
+        final actual = _colecciones.firstWhere(
+          (c) => c.idColeccion == editando,
+        );
+        final guardada = await admin.guardarColeccion(
+          actual.copyWith(
+            nombre: nombre,
+            subtitulo: _coleccionSubtitulo.trim(),
+          ),
+        );
+        if (!mounted) return;
+        _reemplazarColeccion(guardada);
+      }
+      _limpiarFormularioColeccion();
+    }, exito: editando == null ? 'Colección creada.' : 'Cambios guardados.');
+  }
+
+  Future<void> _alternarColeccion(int id) async {
+    if (!_hayAdmin()) return;
+    final actual = _colecciones.firstWhere((c) => c.idColeccion == id);
+    final nueva = actual.copyWith(activa: !actual.activa);
+    await _accionFotos(
+      () async {
+        final guardada = await widget.admin!.guardarColeccion(nueva);
+        if (mounted) _reemplazarColeccion(guardada);
+      },
+      exito: nueva.activa ? 'Ahora se ve en la tienda.' : 'Ahora está oculta.',
+    );
+  }
+
+  Future<void> _subirFotoColeccion(int id) async {
+    if (!_hayAdmin()) return;
+    final foto = await _elegirFoto();
+    if (foto == null) return;
+    final actual = _colecciones.firstWhere((c) => c.idColeccion == id);
+    await _accionFotos(() async {
+      final nueva = await widget.admin!.subirFotoColeccion(
+        coleccion: actual,
+        foto: foto,
+      );
+      if (mounted) _reemplazarColeccion(nueva);
+    }, exito: 'Foto guardada.');
+  }
+
+  Future<void> _quitarFotoColeccion(int id) async {
+    if (!_hayAdmin()) return;
+    final actual = _colecciones.firstWhere((c) => c.idColeccion == id);
+    await _accionFotos(() async {
+      final nueva = await widget.admin!.quitarFotoColeccion(actual);
+      if (mounted) _reemplazarColeccion(nueva);
+    }, exito: 'Foto quitada.');
+  }
+
+  /// El primer toque pide confirmación; el segundo borra la colección. Sus
+  /// productos no se borran: quedan sin colección.
+  Future<void> _borrarColeccion(int id) async {
+    if (!_hayAdmin()) return;
+    if (_coleccionPorBorrar != id) {
+      setState(() => _coleccionPorBorrar = id);
+      _aviso(
+        'Toca "Confirmar: borrar" para borrarla. Sus productos no se borran.',
+      );
+      return;
+    }
+    final actual = _colecciones.firstWhere((c) => c.idColeccion == id);
+    await _accionFotos(() async {
+      await widget.admin!.borrarColeccion(actual);
+      if (!mounted) return;
+      setState(() {
+        _colecciones = [
+          for (final c in _colecciones)
+            if (c.idColeccion != id) c,
+        ];
+        _productos = [
+          for (final p in _productos)
+            if (p.idColeccion == id) p.sinColeccion() else p,
+        ];
+        _coleccionPorBorrar = null;
+        if (_coleccionEditando == id) {
+          _coleccionEditando = null;
+          _coleccionNombre = '';
+          _coleccionSubtitulo = '';
+        }
+      });
+    }, exito: 'Colección borrada.');
+  }
+
   Future<void> _alternarVisible(int idProducto) async {
     if (!_hayAdmin()) return;
     final actual = _productos.firstWhere((p) => p.idProducto == idProducto);
@@ -764,6 +978,8 @@ class _TinaScreenState extends State<TinaScreen> {
       ocupado: _fotosOcupado,
       onCampo: _campoProducto,
       onCategoria: (id) => _cambiarBorrador((b) => b.copyWith(idCategoria: id)),
+      colecciones: _colecciones,
+      onColeccion: (id) => _cambiarBorrador((b) => b.copyWith(idColeccion: id)),
       onVisible: (v) => _cambiarBorrador((b) => b.copyWith(activo: v)),
       onVarianteCampo: _campoVariante,
       onVarianteStock: (clave, n) => _cambiarBorrador(
@@ -969,6 +1185,7 @@ class _TinaScreenState extends State<TinaScreen> {
 
   void _irInicio() {
     _categoriaActiva = null;
+    _coleccionActiva = null;
     _filtros = const FiltrosCatalogo();
     _filtrosVisibles = false;
     _raiz(Ruta.inicio);
@@ -986,6 +1203,7 @@ class _TinaScreenState extends State<TinaScreen> {
       case DestinoNav.inicio:
         _irInicio();
       case DestinoNav.categorias:
+        _coleccionActiva = null;
         _categoriaActiva ??= _categorias.first.nombre;
         _raiz(Ruta.lista);
       case DestinoNav.carrito:
@@ -998,15 +1216,140 @@ class _TinaScreenState extends State<TinaScreen> {
   void _onCategoria(String? categoria) {
     if (categoria == null) {
       _irInicio();
+    } else if (categoria == CharmBar.categoriaBase) {
+      // El Charm Bar no es una lista: es el armador de collares.
+      _abrirCharmBar();
     } else {
       // Cada categoría empieza sin filtros.
-      if (categoria != _categoriaActiva) {
+      if (categoria != _categoriaActiva || _coleccionActiva != null) {
         _filtros = const FiltrosCatalogo();
         _filtrosVisibles = false;
       }
       _categoriaActiva = categoria;
+      _coleccionActiva = null;
       _raiz(Ruta.lista);
     }
+  }
+
+  void _irColecciones() => _raiz(Ruta.colecciones);
+
+  void _abrirColeccion(String nombre) {
+    final c = _colecciones.where((c) => c.nombre == nombre).firstOrNull;
+    if (c == null) return;
+    setState(() {
+      _coleccionActiva = c.idColeccion;
+      _filtros = const FiltrosCatalogo();
+      _filtrosVisibles = false;
+    });
+    _raiz(Ruta.lista);
+  }
+
+  void _irBuscar() {
+    setState(() => _consulta = '');
+    _raiz(Ruta.buscar);
+  }
+
+  // ------------------------------------------------------------- Charm Bar
+  CharmBar get _charmBar => CharmBar.desde(_vistas());
+
+  /// Abre el armador con el primer color y el primer modo que haya.
+  void _abrirCharmBar() {
+    final bar = _charmBar;
+    final color = bar.colores.firstOrNull ?? '';
+    setState(() {
+      _armado = ArmadoCollar(
+        color: color,
+        modo: bar.modosDe(color).firstOrNull ?? '',
+      );
+    });
+    _raiz(Ruta.charmBar);
+  }
+
+  void _armadoColor(String color) {
+    final modos = _charmBar.modosDe(color);
+    setState(() {
+      _armado = _armado.copyWith(
+        color: color,
+        modo: modos.contains(_armado.modo)
+            ? _armado.modo
+            : (modos.firstOrNull ?? ''),
+      );
+    });
+  }
+
+  void _armadoAgregarCharm(int idVariante) {
+    final charm = _charmBar.charm(idVariante);
+    if (charm == null) return;
+    if (_armado.elegidos >= _armado.cantidad) {
+      _aviso(
+        'Ya elegiste tus ${_armado.cantidad} '
+        '${_armado.cantidad == 1 ? 'charm' : 'charms'}. Quita uno o pide más.',
+      );
+      return;
+    }
+    if ((_armado.seleccion[idVariante] ?? 0) >= charm.stock) {
+      _aviso('Solo quedan ${charm.stock} de ${charm.nombre}.');
+      return;
+    }
+    setState(() => _armado = _armado.conCharm(idVariante, charm.stock));
+  }
+
+  /// Pone en el carrito el collar y cada charm elegido, como artículos normales
+  /// (cada uno descuenta su propio stock).
+  void _armadoAlCarrito() {
+    final bar = _charmBar;
+    if (!_armado.completo) {
+      _aviso(
+        _armado.faltan == 1
+            ? 'Te falta elegir 1 charm.'
+            : 'Te faltan ${_armado.faltan} charms por elegir.',
+      );
+      return;
+    }
+    final base = bar.varianteBase(_armado.color, _armado.modo);
+    if (base == null || base.stock < 1) {
+      _aviso('Ese collar está agotado. Prueba con otro color.');
+      return;
+    }
+    final pedidos = <int, int>{base.idVariante: 1, ..._armado.seleccion};
+    for (final e in pedidos.entries) {
+      final enCarrito = _items
+          .where((i) => i.idVariante == e.key)
+          .fold(0, (s, i) => s + i.cantidad);
+      final stock = e.key == base.idVariante
+          ? base.stock
+          : (bar.charm(e.key)?.stock ?? 0);
+      if (enCarrito + e.value > stock) {
+        final nombre = e.key == base.idVariante
+            ? 'el collar'
+            : (bar.charm(e.key)?.nombre ?? 'un charm');
+        _aviso('Ya no hay suficientes unidades de $nombre.');
+        return;
+      }
+    }
+    setState(() {
+      var items = [..._items];
+      for (final e in pedidos.entries) {
+        final i = items.indexWhere((x) => x.idVariante == e.key);
+        if (i >= 0) {
+          items[i] = items[i].copyWith(cantidad: items[i].cantidad + e.value);
+        } else {
+          items = [
+            ...items,
+            CarritoItem(
+              idItem: _siguienteItem++,
+              idCarrito: 1,
+              idVariante: e.key,
+              cantidad: e.value,
+            ),
+          ];
+        }
+      }
+      _items = items;
+      _armado = const ArmadoCollar();
+    });
+    _aviso('Tu collar quedó en el carrito.');
+    _raiz(Ruta.carrito);
   }
 
   // -------------------------------------------------------------- detalle
@@ -1864,6 +2207,10 @@ class _TinaScreenState extends State<TinaScreen> {
   Page<void> _pagina(Ruta ruta) {
     final Widget hijo = switch (ruta) {
       Ruta.inicio => InicioPage(
+        enlaces: _enlaces,
+        colecciones: _itemsColecciones,
+        onColeccion: _abrirColeccion,
+        fotoBannerCharmBar: _urlSitio('banner_charm_bar'),
         fotoPortada: _urlSitio('portada_inicio'),
         productos: _vistas(),
         categorias: _nombresCategorias,
@@ -1876,15 +2223,16 @@ class _TinaScreenState extends State<TinaScreen> {
         onNav: _onNav,
       ),
       Ruta.lista => ListaPage(
+        enlaces: _enlaces,
         onLogo: _irInicio,
-        categoriaActiva: _categoriaActiva ?? _categorias.first.nombre,
+        categoriaActiva: _coleccionActiva != null
+            ? _colecciones
+                  .firstWhere((c) => c.idColeccion == _coleccionActiva)
+                  .nombre
+            : (_categoriaActiva ?? _categorias.first.nombre),
         categorias: _itemsCategorias,
-        productos: _filtros.aplicar(
-          _vistas(categoria: _categoriaActiva ?? _categorias.first.nombre),
-        ),
-        todosDeLaCategoria: _vistas(
-          categoria: _categoriaActiva ?? _categorias.first.nombre,
-        ),
+        productos: _filtros.aplicar(_productosDeLaLista()),
+        todosDeLaCategoria: _productosDeLaLista(),
         filtros: _filtros,
         filtrosVisibles: _filtrosVisibles,
         onFiltros: (f) => setState(() => _filtros = f),
@@ -1898,6 +2246,7 @@ class _TinaScreenState extends State<TinaScreen> {
         onNav: _onNav,
       ),
       Ruta.detalle => DetallePage(
+        enlaces: _enlaces,
         onNav: _onNav,
         onInicio: _irInicio,
         onCategoria: _onCategoria,
@@ -1982,6 +2331,50 @@ class _TinaScreenState extends State<TinaScreen> {
         onAtras: _volver,
       ),
       Ruta.pagoRetorno => _pagoRetorno(),
+      Ruta.buscar => BuscarPage(
+        enlaces: _enlaces,
+        consulta: _consulta,
+        resultados: buscarProductos(_vistas(), _consulta),
+        sugerencias: [
+          for (final c in _nombresCategorias)
+            if (c != CharmBar.categoriaBase) c,
+        ],
+        unidadesCarrito: _unidades,
+        onConsulta: (q) => setState(() => _consulta = q),
+        onProducto: _abrirProducto,
+        onAtras: _irInicio,
+        onCarrito: _irCarrito,
+        onLogo: _irInicio,
+        onNav: _onNav,
+      ),
+      Ruta.colecciones => ColeccionesPage(
+        enlaces: _enlaces,
+        colecciones: _itemsColecciones,
+        unidadesCarrito: _unidades,
+        onColeccion: _abrirColeccion,
+        onAtras: _irInicio,
+        onCarrito: _irCarrito,
+        onLogo: _irInicio,
+        onNav: _onNav,
+      ),
+      Ruta.charmBar => CharmBarPage(
+        enlaces: _enlaces,
+        charmBar: _charmBar,
+        armado: _armado,
+        fotoPortada: _urlSitio('charm_bar_portada'),
+        unidadesCarrito: _unidades,
+        onColor: _armadoColor,
+        onModo: (m) => setState(() => _armado = _armado.copyWith(modo: m)),
+        onCantidad: (n) => setState(() => _armado = _armado.conCantidad(n)),
+        onAgregarCharm: _armadoAgregarCharm,
+        onQuitarCharm: (id) => setState(() => _armado = _armado.sinCharm(id)),
+        onAgregarAlCarrito: _armadoAlCarrito,
+        onVerTienda: _irInicio,
+        onAtras: _irInicio,
+        onCarrito: _irCarrito,
+        onLogo: _irInicio,
+        onNav: _onNav,
+      ),
     };
     return MaterialPage<void>(
       key: ValueKey(ruta),
@@ -2125,6 +2518,38 @@ class _TinaScreenState extends State<TinaScreen> {
           onBorrar: _borrarFotoProducto,
           onSalir: _cerrarSesion,
           onVerTienda: _irInicio,
+        );
+      case SeccionPanel.colecciones:
+        return PanelColeccionesPage(
+          colecciones: _colecciones,
+          productosPorColeccion: {
+            for (final c in _colecciones)
+              c.idColeccion: _productos
+                  .where((p) => p.idColeccion == c.idColeccion)
+                  .length,
+          },
+          nombre: _coleccionNombre,
+          subtitulo: _coleccionSubtitulo,
+          editandoId: _coleccionEditando,
+          idPorBorrar: _coleccionPorBorrar,
+          ocupado: _fotosOcupado,
+          onCampo: (campo, valor) => setState(() {
+            if (campo == 'nombre') {
+              _coleccionNombre = valor;
+            } else {
+              _coleccionSubtitulo = valor;
+            }
+          }),
+          onGuardar: _guardarColeccion,
+          onCancelarEdicion: _limpiarFormularioColeccion,
+          onEditar: _editarColeccion,
+          onAlternar: _alternarColeccion,
+          onSubirFoto: _subirFotoColeccion,
+          onQuitarFoto: _quitarFotoColeccion,
+          onBorrar: _borrarColeccion,
+          onSeccion: (s) => setState(() => _seccionPanel = s),
+          onVerTienda: _irInicio,
+          onSalir: widget.sesiones == null ? null : _cerrarSesion,
         );
       case SeccionPanel.fotosSitio:
         return PanelFotosSitioPage(

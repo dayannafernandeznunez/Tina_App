@@ -64,6 +64,7 @@ class BorradorProducto {
     this.tecnica = '',
     this.precio = '',
     this.idCategoria = 0,
+    this.idColeccion = 0,
     this.activo = true,
     this.variantes = const [],
     this.idsVariantesOriginales = const [],
@@ -93,6 +94,7 @@ class BorradorProducto {
     tecnica: p.tecnica,
     precio: p.precio.toString(),
     idCategoria: p.idCategoria,
+    idColeccion: p.idColeccion ?? 0,
     activo: p.activo,
     variantes: [
       for (final v in variantes)
@@ -117,6 +119,9 @@ class BorradorProducto {
   /// Lo que se escribió en el campo de precio, tal cual.
   final String precio;
   final int idCategoria;
+
+  /// La colección del producto; 0 si no está en ninguna.
+  final int idColeccion;
   final bool activo;
   final List<BorradorVariante> variantes;
 
@@ -140,6 +145,7 @@ class BorradorProducto {
     String? tecnica,
     String? precio,
     int? idCategoria,
+    int? idColeccion,
     bool? activo,
     List<BorradorVariante>? variantes,
     List<FotoNueva>? fotosNuevas,
@@ -151,6 +157,7 @@ class BorradorProducto {
     tecnica: tecnica ?? this.tecnica,
     precio: precio ?? this.precio,
     idCategoria: idCategoria ?? this.idCategoria,
+    idColeccion: idColeccion ?? this.idColeccion,
     activo: activo ?? this.activo,
     variantes: variantes ?? this.variantes,
     idsVariantesOriginales: idsVariantesOriginales,
@@ -178,6 +185,7 @@ class BorradorProducto {
     tecnica: tecnica,
     precio: precio,
     idCategoria: idCategoria,
+    idColeccion: idColeccion,
     activo: activo,
     variantes: [
       for (final v in variantes)
@@ -213,6 +221,7 @@ class BorradorProducto {
     tecnica: tecnica,
     precio: precio,
     idCategoria: idCategoria,
+    idColeccion: idColeccion,
     activo: activo,
     variantes: variantes,
     idsVariantesOriginales: idsVariantesOriginales,
@@ -322,6 +331,7 @@ class BorradorProducto {
   Producto aProducto() => Producto(
     idProducto: idProducto,
     idCategoria: idCategoria,
+    idColeccion: idColeccion == 0 ? null : idColeccion,
     nombre: nombre.trim(),
     descripcion: descripcion.trim(),
     tecnica: tecnica.trim(),

@@ -6,6 +6,7 @@ import 'tina_barra_escritorio.dart';
 import 'tina_barra_promo.dart';
 import 'tina_barra_superior.dart';
 import 'tina_boton_whatsapp.dart';
+import 'tina_enlaces.dart';
 import 'tina_fondo_marca.dart';
 import 'tina_nav_inferior.dart';
 
@@ -34,6 +35,7 @@ class TinaScaffold extends StatelessWidget {
     this.accion,
     this.conFondo = true,
     this.conPromo = false,
+    this.enlaces = const EnlacesTienda(),
   });
 
   final Widget cuerpo;
@@ -54,6 +56,9 @@ class TinaScaffold extends StatelessWidget {
 
   /// Muestra la franja de promoción y el botón de WhatsApp.
   final bool conPromo;
+
+  /// Los enlaces extra de la cabecera: Charm Bar, colecciones y buscador.
+  final EnlacesTienda enlaces;
 
   /// Qué tan fuerte se ve el fondo de la marca detrás del contenido (0 a 1).
   static const double opacidadFondo = 0.28;
@@ -84,6 +89,7 @@ class TinaScaffold extends StatelessWidget {
             onAtras: onAtras,
             onLogo: onLogo,
             onCarrito: onCarrito,
+            enlaces: enlaces,
           )
         : TinaBarraSuperior(
             titulo: titulo,
@@ -93,6 +99,7 @@ class TinaScaffold extends StatelessWidget {
             onAtras: onAtras,
             onCarrito: onCarrito,
             onLogo: onLogo,
+            onBuscar: enlaces.onBuscar,
           );
 
     final contenido = conFondo

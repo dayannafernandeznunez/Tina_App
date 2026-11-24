@@ -18,6 +18,60 @@ class Categoria {
   final String descripcion;
 }
 
+/// Tabla COLECCION: un grupo de productos con nombre, subtítulo y foto (por
+/// ejemplo "Con amor, para mí"). Una colección oculta no se ve en la tienda.
+class Coleccion {
+  const Coleccion({
+    required this.idColeccion,
+    required this.nombre,
+    this.subtitulo = '',
+    this.orden = 1,
+    this.activa = true,
+    this.url,
+    this.ruta,
+  });
+
+  /// Arma la colección a partir de una fila de Supabase.
+  factory Coleccion.desdeMapa(Map<String, dynamic> fila) => Coleccion(
+    idColeccion: fila['id_coleccion'] as int,
+    nombre: fila['nombre'] as String,
+    subtitulo: (fila['subtitulo'] as String?) ?? '',
+    orden: (fila['orden'] as int?) ?? 1,
+    activa: (fila['activa'] as bool?) ?? true,
+    url: fila['url'] as String?,
+    ruta: fila['ruta'] as String?,
+  );
+
+  final int idColeccion;
+  final String nombre;
+  final String subtitulo;
+  final int orden;
+  final bool activa;
+
+  /// La foto de la colección y su archivo en la carpeta de fotos del sitio.
+  final String? url;
+  final String? ruta;
+
+  bool get tieneFoto => url != null && url!.isNotEmpty;
+
+  Coleccion copyWith({
+    String? nombre,
+    String? subtitulo,
+    bool? activa,
+    String? url,
+    String? ruta,
+    bool sinFoto = false,
+  }) => Coleccion(
+    idColeccion: idColeccion,
+    nombre: nombre ?? this.nombre,
+    subtitulo: subtitulo ?? this.subtitulo,
+    orden: orden,
+    activa: activa ?? this.activa,
+    url: sinFoto ? null : (url ?? this.url),
+    ruta: sinFoto ? null : (ruta ?? this.ruta),
+  );
+}
+
 /// Tabla PRODUCTO. El precio se guarda en pesos enteros (COP).
 class Producto {
   const Producto({
@@ -28,6 +82,7 @@ class Producto {
     required this.tecnica,
     required this.precio,
     this.activo = true,
+    this.idColeccion,
   });
 
   /// Arma el producto a partir de una fila de Supabase.
@@ -39,6 +94,7 @@ class Producto {
     tecnica: (fila['tecnica'] as String?) ?? '',
     precio: fila['precio'] as int,
     activo: (fila['activo'] as bool?) ?? true,
+    idColeccion: fila['id_coleccion'] as int?,
   );
 
   final int idProducto;
@@ -49,6 +105,20 @@ class Producto {
   final int precio;
   final bool activo;
 
+  /// La colección a la que pertenece; `null` si no está en ninguna.
+  final int? idColeccion;
+
+  /// El mismo producto, sin colección.
+  Producto sinColeccion() => Producto(
+    idProducto: idProducto,
+    idCategoria: idCategoria,
+    nombre: nombre,
+    descripcion: descripcion,
+    tecnica: tecnica,
+    precio: precio,
+    activo: activo,
+  );
+
   Producto copyWith({bool? activo}) => Producto(
     idProducto: idProducto,
     idCategoria: idCategoria,
@@ -57,6 +127,7 @@ class Producto {
     tecnica: tecnica,
     precio: precio,
     activo: activo ?? this.activo,
+    idColeccion: idColeccion,
   );
 }
 

@@ -5,6 +5,7 @@ import 'tina_hover.dart';
 import '../utils/adaptable.dart';
 import 'tina_boton_redondo.dart';
 import 'tina_carrito_redondo.dart';
+import 'tina_enlaces.dart';
 import 'tina_logo.dart';
 import 'tina_nav_inferior.dart';
 
@@ -24,7 +25,11 @@ class TinaBarraEscritorio extends StatelessWidget
     this.onAtras,
     this.onLogo,
     this.onCarrito,
+    this.enlaces = const EnlacesTienda(),
   });
+
+  /// Charm Bar, colecciones y buscador (los que no tengan destino no se ven).
+  final EnlacesTienda enlaces;
 
   final String? titulo;
   final bool conAtras;
@@ -88,18 +93,56 @@ class TinaBarraEscritorio extends StatelessWidget
                 ],
                 const Spacer(),
                 if (onNav != null) ...[
-                  for (final destino in const [
-                    DestinoNav.inicio,
-                    DestinoNav.categorias,
-                  ])
-                    _Enlace(
-                      key: ValueKey('nav-${destino.name}'),
-                      etiqueta: _etiquetas[destino]!,
-                      activo: destino == activo,
-                      insignia: 0,
-                      onTap: () => onNav!(destino),
+                  // Los enlaces de texto se achican si la ventana es angosta,
+                  // para que los íconos de la derecha nunca se salgan.
+                  Flexible(
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerRight,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          for (final destino in const [
+                            DestinoNav.inicio,
+                            DestinoNav.categorias,
+                          ])
+                            _Enlace(
+                              key: ValueKey('nav-${destino.name}'),
+                              etiqueta: _etiquetas[destino]!,
+                              activo: destino == activo,
+                              insignia: 0,
+                              onTap: () => onNav!(destino),
+                            ),
+                          if (enlaces.onCharmBar != null)
+                            _Enlace(
+                              key: const ValueKey('nav-charmbar'),
+                              etiqueta: 'Charm Bar',
+                              activo: titulo == 'Charm Bar',
+                              insignia: 0,
+                              onTap: enlaces.onCharmBar!,
+                            ),
+                          if (enlaces.onColecciones != null)
+                            _Enlace(
+                              key: const ValueKey('nav-colecciones'),
+                              etiqueta: 'Colecciones',
+                              activo: false,
+                              insignia: 0,
+                              onTap: enlaces.onColecciones!,
+                            ),
+                        ],
+                      ),
                     ),
+                  ),
                   const SizedBox(width: 12),
+                  if (enlaces.onBuscar != null)
+                    _IconoNav(
+                      key: const ValueKey('nav-buscar'),
+                      etiqueta: 'Buscar',
+                      icono: Icons.search_rounded,
+                      activo: false,
+                      insignia: 0,
+                      onTap: enlaces.onBuscar!,
+                    ),
                   _IconoNav(
                     key: const ValueKey('nav-cuenta'),
                     etiqueta: 'Cuenta',

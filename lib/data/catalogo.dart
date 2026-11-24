@@ -14,6 +14,7 @@ class Catalogo {
     required this.promociones,
     this.imagenes = const [],
     this.ajustesSitio = const [],
+    this.colecciones = const [],
   });
 
   final List<Categoria> categorias;
@@ -25,6 +26,9 @@ class Catalogo {
   /// Los lugares del sitio donde la administradora puede poner una foto
   /// (`portada_inicio`, `logo`...), con la foto que tienen ahora.
   final List<AjusteSitio> ajustesSitio;
+
+  /// Los grupos de productos (la administradora ve también los ocultos).
+  final List<Coleccion> colecciones;
 }
 
 /// De dónde sale el catálogo. La app solo conoce esta interfaz, así que se
@@ -62,6 +66,7 @@ class CatalogoSupabase implements CatalogoRepositorio {
           .order('id_producto', ascending: true)
           .order('orden', ascending: true),
       _cliente.from('ajuste_sitio').select(),
+      _cliente.from('coleccion').select().order('orden', ascending: true),
     ]);
 
     return Catalogo(
@@ -71,6 +76,7 @@ class CatalogoSupabase implements CatalogoRepositorio {
       promociones: respuestas[3].map(Promocion.desdeMapa).toList(),
       imagenes: respuestas[4].map(ImagenProducto.desdeMapa).toList(),
       ajustesSitio: respuestas[5].map(AjusteSitio.desdeMapa).toList(),
+      colecciones: respuestas[6].map(Coleccion.desdeMapa).toList(),
     );
   }
 }

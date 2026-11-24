@@ -42,3 +42,4 @@ export 'tina_pie_pagina.dart';
 export 'tina_titulo_seccion.dart';
 export 'tina_panel_filtros.dart';
 export 'tina_pestanas.dart';
+export 'tina_enlaces.dart';

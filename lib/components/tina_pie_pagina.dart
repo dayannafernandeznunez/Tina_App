@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../config/tienda_config.dart';
 import '../theme/tina_tema.dart';
 import '../utils/abrir_url.dart';
+import 'tina_enlaces.dart';
 import 'tina_hover.dart';
 import 'tina_logo.dart';
 
@@ -14,7 +15,11 @@ class TinaPiePagina extends StatelessWidget {
     required this.categorias,
     required this.onCategoria,
     required this.onLogo,
+    this.enlaces = const EnlacesTienda(),
   });
+
+  /// Para sumar el Charm Bar y las colecciones a la lista de "Comprar".
+  final EnlacesTienda enlaces;
 
   final List<String> categorias;
 
@@ -73,6 +78,12 @@ class TinaPiePagina extends StatelessWidget {
               key: ValueKey('pie-$c'),
               texto: c,
               onTap: () => onCategoria(c),
+            ),
+          if (enlaces.onColecciones != null)
+            _Enlace(
+              key: const ValueKey('pie-colecciones'),
+              texto: 'Colecciones',
+              onTap: enlaces.onColecciones!,
             ),
         ],
       ),
