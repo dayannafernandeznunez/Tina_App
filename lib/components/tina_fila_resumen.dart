@@ -68,39 +68,52 @@ class TinaFilaResumen extends StatelessWidget {
               borderRadius: BorderRadius.circular(8),
             ),
             padding: const EdgeInsets.symmetric(vertical: 11),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    spacing: 2,
-                    children: [
-                      Text(etiqueta, style: TinaTipografia.estilo(tamano: 15)),
-                      if (detalle != null && detalle!.isNotEmpty)
+            // El valor puede ser largo (un correo): ocupa hasta el 60 % del
+            // ancho y, si no cabe, baja de renglón en vez de salirse.
+            child: LayoutBuilder(
+              builder: (context, restricciones) => Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      spacing: 2,
+                      children: [
                         Text(
-                          detalle!,
-                          style: TinaTipografia.estilo(
-                            tamano: 13,
-                            color: TinaColores.marron,
-                          ),
+                          etiqueta,
+                          style: TinaTipografia.estilo(tamano: 15),
                         ),
-                    ],
+                        if (detalle != null && detalle!.isNotEmpty)
+                          Text(
+                            detalle!,
+                            style: TinaTipografia.estilo(
+                              tamano: 13,
+                              color: TinaColores.marron,
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
-                ),
-                const SizedBox(width: 14),
-                Text(
-                  valor,
-                  style: TinaTipografia.estilo(
-                    tamano: 15,
-                    peso: FontWeight.w800,
-                    color: tipo == TipoFila.descuento
-                        ? TinaColores.rojo
-                        : TinaColores.tinta,
+                  const SizedBox(width: 14),
+                  ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxWidth: restricciones.maxWidth * 0.6,
+                    ),
+                    child: Text(
+                      valor,
+                      textAlign: TextAlign.end,
+                      style: TinaTipografia.estilo(
+                        tamano: 15,
+                        peso: FontWeight.w800,
+                        color: tipo == TipoFila.descuento
+                            ? TinaColores.rojo
+                            : TinaColores.tinta,
+                      ),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
           const _LineaPunteada(),

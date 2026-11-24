@@ -132,6 +132,38 @@ void main() {
       expect(_valor('contacto-correo', '—'), findsOneWidget);
     });
 
+    testWidgets(
+      'un correo muy largo baja de renglón y no se sale de la pantalla',
+      (tester) async {
+        TinaTipografia.usarFuenteWeb = false;
+        tester.view.physicalSize = const Size(360, 3000);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: TinaTema.crear(),
+            home: PedidoPage(
+              pedido: _pedido(
+                correo: 'dayannafernandeznunez.compras.tina@correoinstitucional.edu.co',
+              ),
+              onAtras: () {},
+            ),
+          ),
+        );
+
+        // Si el correo se saliera, Flutter marcaría un error de desborde y la
+        // prueba fallaría. Aquí solo hace falta que se vea completo.
+        expect(tester.takeException(), isNull);
+        expect(
+          _valor(
+            'contacto-correo',
+            'dayannafernandeznunez.compras.tina@correoinstitucional.edu.co',
+          ),
+          findsOneWidget,
+        );
+      },
+    );
+
     testWidgets('el texto se puede seleccionar para copiarlo', (tester) async {
       await _abrir(tester, _pedido());
 
