@@ -62,6 +62,26 @@ export async function checksumEvento(
   return sha256Hex(`${valores.join('')}${evento?.timestamp ?? ''}${secreto}`);
 }
 
+/** Quita espacios, saltos de línea y comillas que se cuelan al pegar un secreto. */
+export function limpiarSecreto(valor: string): string {
+  return String(valor ?? '').trim().replace(/^["']+|["']+$/g, '').trim();
+}
+
+/**
+ * Qué anotar en los Logs cuando un aviso llega con la firma mala. No incluye
+ * nada secreto: del secreto solo su tipo (test_events, prod_events o "otro") y
+ * su largo. Sirve para ver si se guardó el secreto equivocado.
+ */
+export function diagnosticoFirma(evento: any, secreto: string): Record<string, unknown> {
+  const tipo = /^(test|prod)_events_/.exec(secreto);
+  return {
+    tipo_de_secreto: tipo ? `${tipo[1]}_events` : 'no empieza por test_events_ ni prod_events_',
+    largo_del_secreto: secreto.length,
+    ambiente_del_aviso: evento?.environment ?? null,
+    tiene_firma: typeof evento?.signature?.checksum === 'string',
+  };
+}
+
 function iguales(a: string, b: string): boolean {
   if (a.length !== b.length) return false;
   let diferencia = 0;
@@ -96,6 +116,10 @@ export async function recibirEvento(
   deps: Dependencias,
 ): Promise<Respuesta> {
   if (!(await eventoValido(evento, deps.secretoEventos))) {
+    console.error(
+      'Aviso de Wompi con la firma no válida:',
+      JSON.stringify(diagnosticoFirma(evento, deps.secretoEventos)),
+    );
     return { estado: 401, cuerpo: { error: 'Firma no válida.' } };
   }
   if (evento.event !== 'transaction.updated') {
@@ -144,7 +168,7 @@ if (typeof Deno !== 'undefined') {
   const llaveServicio = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
   const deps: Dependencias = {
-    secretoEventos: Deno.env.get('WOMPI_EVENTS_SECRET') ?? '',
+    secretoEventos: limpiarSecreto(Deno.env.get('WOMPI_EVENTS_SECRET') ?? ''),
     // Llama a la función avisar-pedido identificándose con la llave de servicio.
     avisar: async (idPedido) => {
       const r = await fetch(`${urlSupabase}/functions/v1/avisar-pedido`, {

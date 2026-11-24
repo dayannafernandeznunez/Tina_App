@@ -6,6 +6,8 @@ import { createHash } from 'node:crypto';
 import {
   firmaIntegridad,
   iniciarPago,
+  limpiarSecreto,
+  problemaEnLlaves,
   urlCheckout,
 } from '../functions/iniciar-pago/index.ts';
 import {
@@ -130,6 +132,44 @@ const otro = await firmado({ ...aviso('APPROVED'), event: 'nequi_token.updated' 
 const antesOtro = avisos.length;
 r = await recibirEvento(otro, depsEvento({ datos: {}, error: null }));
 igual('otros tipos de aviso se ignoran', [r.estado, avisos.length], [200, antesOtro]);
+
+console.log('\n--- Diagnóstico de un aviso con la firma mala');
+import { diagnosticoFirma, limpiarSecreto as limpiarEventos } from '../functions/wompi-eventos/index.ts';
+const diag = diagnosticoFirma({ environment: 'test', signature: { checksum: 'x' } }, 'test_events_abcdef');
+igual('anota el tipo y el largo del secreto, no el secreto', [diag.tipo_de_secreto, diag.largo_del_secreto, diag.ambiente_del_aviso, JSON.stringify(diag).includes('abcdef')], ['test_events', 18, 'test', false]);
+igual('si el secreto guardado es otra cosa, lo dice', diagnosticoFirma({}, '**********').tipo_de_secreto, 'no empieza por test_events_ ni prod_events_');
+igual('los asteriscos de un campo oculto no pasan por secreto de eventos', diagnosticoFirma({}, '*************').tipo_de_secreto.startsWith('no empieza'), true);
+igual('el secreto de eventos también se limpia', limpiarEventos('  "test_events_abc"\n'), 'test_events_abc');
+const firmaEv = await (async () => {
+  const e = { event: 'transaction.updated', data: { transaction: { id: 't', status: 'APPROVED', amount_in_cents: 100, reference: 'TINA-0001-1' } }, signature: { properties: ['transaction.id', 'transaction.status', 'transaction.amount_in_cents'] }, timestamp: 1 };
+  return { ...e, signature: { ...e.signature, checksum: await checksumEvento(e, 'test_events_abc') } };
+})();
+igual('con el secreto limpio un aviso bien firmado se acepta', (await recibirEvento(firmaEv, { secretoEventos: limpiarEventos('  test_events_abc \n'), rpc: async () => ({ datos: { resultado: 'aprobado', id_pedido: 1 }, error: null }) })).estado, 200);
+
+console.log('\n--- Llaves de Wompi mal puestas');
+const respuestaPago = {
+  datos: { referencia: 'TINA-0012-1', monto_en_centavos: 2200000, moneda: 'COP', correo: 'a@b.co', nombre: 'L', telefono: '3001112233' },
+  error: null,
+};
+const conSecreto = (secreto) =>
+  iniciarPago({ id_pedido: 12, token: TOKEN }, { ...depsPago(respuestaPago), secretoIntegridad: secreto });
+const firmaDe = (x) => new URL(x.cuerpo.url).searchParams.get('signature:integrity');
+
+const limpia = await conSecreto('test_integrity_secreto');
+const sucia = await conSecreto('  "test_integrity_secreto"\n');
+igual('un secreto pegado con espacios, comillas y salto de línea da la misma firma', firmaDe(sucia), firmaDe(limpia));
+igual('limpiarSecreto quita comillas y espacios', limpiarSecreto(" 'abc' "), 'abc');
+
+let x = await conSecreto('test_events_secreto');
+igual('el secreto de eventos en lugar del de integridad se detecta', [x.estado, x.cuerpo.error], [500, 'Revisa los secretos de Wompi: WOMPI_INTEGRITY_SECRET tiene el secreto de EVENTOS; hace falta el de INTEGRIDAD.']);
+x = await conSecreto('prod_integrity_secreto');
+igual('un secreto de otro ambiente se detecta y dice cuál es', [x.estado, x.cuerpo.error.includes('test_integrity_')], [500, true]);
+x = await conSecreto('prv_test_otracosa');
+igual('un secreto que no es de integridad se detecta', x.estado, 500);
+igual('una llave pública rara se detecta', problemaEnLlaves('abc', 'test_integrity_x'), 'WOMPI_PUBLIC_KEY debe empezar por pub_test_ o pub_prod_.');
+igual('llaves bien puestas no tienen problema', [problemaEnLlaves('pub_test_a', 'test_integrity_b'), problemaEnLlaves('pub_prod_a', 'prod_integrity_b')], [null, null]);
+const enProd = await iniciarPago({ id_pedido: 12, token: TOKEN }, { ...depsPago(respuestaPago), llavePublica: 'pub_prod_abc', secretoIntegridad: 'test_integrity_x' });
+igual('en producción no se cuenta qué secreto falló', enProd.cuerpo.error, 'El pago en línea todavía no está configurado.');
 
 console.log(`\n${ok} bien, ${mal} mal`);
 process.exit(mal ? 1 : 0);

@@ -33,6 +33,7 @@ const pedidoWompi = {
   costo_envio: 5000,
   total: 41000,
   cliente: 'Laura Caicedo',
+  correo: 'laura@correo.com',
   telefono: '300 123 4567',
   destinatario: 'Laura Caicedo',
   direccion: 'Calle 5 #38-20',
@@ -66,6 +67,7 @@ const m = armarMensaje(pedidoWompi);
 igual('lleva el código del pedido', m.includes('TINA-0012'), true);
 igual('dice que ya está pagado con Wompi', m.includes('Pagado con Wompi'), true);
 igual('lleva el nombre y el enlace para escribirle', [m.includes('Laura Caicedo'), m.includes('https://wa.me/573001234567')], [true, true]);
+igual('lleva el teléfono y el correo para contactarla', [m.includes('*Teléfono:* 300 123 4567'), m.includes('*Correo:* laura@correo.com')], [true, true]);
 igual('lista los artículos con cantidad, color y talla', [m.includes('• 2 × Aretes de porcelanicrón · Nude'), m.includes('• 1 × Pulsera tejida · Blanco (talla M)')], [true, true]);
 igual('muestra el total con descuento y envío', m.includes('*Total:* $41.000 (descuento $4.000, envío $5.000)'), true);
 igual('lleva a dónde enviar', m.includes('Calle 5 #38-20, Bogotá, Cundinamarca'), true);

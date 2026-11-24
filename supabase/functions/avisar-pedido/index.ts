@@ -87,6 +87,8 @@ export function armarMensaje(d: any): string {
   );
   partes.push('');
   partes.push(`*Clienta:* ${d.cliente}`);
+  if (d.telefono) partes.push(`*Teléfono:* ${d.telefono}`);
+  if (d.correo) partes.push(`*Correo:* ${d.correo}`);
   const tel = telefonoParaWhatsApp(d.telefono);
   if (tel) partes.push(`*Escríbele:* https://wa.me/${tel}`);
   partes.push('');

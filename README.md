@@ -14,7 +14,7 @@ comprobantes, envíos, historial).
 | Cuentas e ingreso (clientas y administradora) | **Reales**: Supabase Auth, un solo ingreso para todas |
 | Pedidos (crear, ver, cambiar estado), stock, descuentos y envío | **Reales**: los crea y calcula Supabase |
 | Contraentrega en Cali | **Real**: pedido pendiente que se coordina por WhatsApp |
-| Pago en línea con Wompi | **En modo de pruebas**: la tienda crea el pedido, lleva a la página de pago de Wompi y el pago de prueba se aprueba (ver [la sección de pasarela de pago](#pasarela-de-pago-modo-de-pruebas)). Falta confirmar que el aviso de Wompi marque el pedido como "Pagado" por sí solo, y pasar a producción |
+| Pago en línea con Wompi | **En modo de pruebas, de punta a punta**: la tienda crea el pedido, lleva a la página de pago de Wompi, el pago de prueba se aprueba, Wompi avisa a la tienda y el pedido pasa solo a "Pagado" con su comprobante (ver [la sección de pasarela de pago](#pasarela-de-pago-modo-de-pruebas)). Falta pasar a producción |
 
 Sin conexión, o en las pruebas, la app usa **datos de ejemplo** coherentes con
 el modelo.
@@ -68,10 +68,13 @@ Qué está probado y qué falta:
 
 - **Funciona:** la tienda crea el pedido, genera el enlace de pago con la firma de
   integridad y lleva a la clienta a la página de Wompi, donde el pago de prueba
-  (tarjeta `4242 4242 4242 4242`) se aprueba.
-- **Falta confirmar:** que el aviso que manda Wompi a la tienda marque el pedido
-  como "Pagado" automáticamente, y que al volver a la tienda se vea la
-  confirmación.
+  (tarjeta `4242 4242 4242 4242`) se aprueba. Wompi avisa a la tienda con un
+  aviso firmado, la tienda comprueba la firma y el monto, y el pedido pasa a
+  "Pagado" con su comprobante. Al volver, la clienta ve "Pedido confirmado".
+- **Un detalle de los secretos:** en Wompi los secretos aparecen ocultos con
+  asteriscos; hay que presionar "Mostrar" antes de copiarlos, o se guardan los
+  asteriscos y la firma falla. `supabase/pruebas/probar_aviso_wompi.ps1` comprueba
+  que el secreto de eventos guardado en Supabase sea el correcto.
 - **Para producción:** cambiar las llaves y los secretos de pruebas por los de
   producción y poner la dirección real de la tienda.
 
@@ -90,6 +93,8 @@ Hay **un solo ingreso** (Cuenta → Iniciar sesión) para clientas y administrad
 El panel tiene cinco secciones:
 
 1. **Pedidos:** filtra por estado y cámbialos; cada cambio queda en el historial.
+   Al abrir un pedido ves el **contacto de la clienta** (nombre, teléfono y
+   correo, que se pueden seleccionar y copiar), el envío, el pago y el historial.
 2. **Datos cliente:** los números de los pedidos para tomar decisiones: estado
    actual de los pedidos, balance general de las ventas (total vendido, ya
    cobrado, por cobrar, cancelado), descuentos dados, compra promedio, producto
@@ -208,10 +213,9 @@ test/            Pruebas de datos, lógica, componentes, ingreso, panel y recorr
 
 ## Pendientes
 
-- **Pago en línea con Wompi:** está en modo de pruebas y el pago de prueba se
-  aprueba. Falta que el aviso de Wompi marque el pedido como "Pagado" (ver
-  [`supabase/LEEME.md`](supabase/LEEME.md)) y luego pasar a las llaves de
-  producción.
+- **Pago en línea con Wompi:** funciona de punta a punta en modo de pruebas.
+  Falta pasar a las llaves de producción y a la dirección real de la tienda (ver
+  [`supabase/LEEME.md`](supabase/LEEME.md)).
 - **Pedidos sin pagar:** si una clienta no termina de pagar en Wompi, el pedido
   queda pendiente con el stock apartado hasta que la vendedora lo cancele desde
   el panel. Falta que se venzan solos.

@@ -79,6 +79,38 @@ export function urlCheckout(datos: {
   return `https://checkout.wompi.co/p/?${p.toString()}`;
 }
 
+/** Quita espacios, saltos de línea y comillas que se cuelan al pegar un secreto. */
+export function limpiarSecreto(valor: string): string {
+  return String(valor ?? '').trim().replace(/^["']+|["']+$/g, '').trim();
+}
+
+/**
+ * Revisa que las llaves de Wompi sean del tipo correcto y del mismo ambiente:
+ * `pub_test_` va con `test_integrity_` y `pub_prod_` con `prod_integrity_`.
+ * Devuelve un mensaje de qué está mal, o `null` si todo parece bien. Un secreto
+ * equivocado es la causa más común del error "La firma es inválida" de Wompi.
+ */
+export function problemaEnLlaves(
+  llavePublica: string,
+  secretoIntegridad: string,
+): string | null {
+  const ambiente = llavePublica.startsWith('pub_test_')
+    ? 'test'
+    : llavePublica.startsWith('pub_prod_')
+      ? 'prod'
+      : null;
+  if (ambiente === null) {
+    return 'WOMPI_PUBLIC_KEY debe empezar por pub_test_ o pub_prod_.';
+  }
+  if (secretoIntegridad.startsWith(`${ambiente}_events_`)) {
+    return 'WOMPI_INTEGRITY_SECRET tiene el secreto de EVENTOS; hace falta el de INTEGRIDAD.';
+  }
+  if (!secretoIntegridad.startsWith(`${ambiente}_integrity_`)) {
+    return `WOMPI_INTEGRITY_SECRET debe empezar por ${ambiente}_integrity_ (el del mismo ambiente que la llave pública).`;
+  }
+  return null;
+}
+
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export async function iniciarPago(
@@ -90,11 +122,26 @@ export async function iniciarPago(
   if (!Number.isInteger(idPedido) || idPedido < 1 || !UUID.test(token)) {
     return { estado: 400, cuerpo: { error: 'Faltan los datos del pedido.' } };
   }
-  if (!deps.llavePublica || !deps.secretoIntegridad || !deps.sitioUrl) {
+  const llavePublica = limpiarSecreto(deps.llavePublica);
+  const secretoIntegridad = limpiarSecreto(deps.secretoIntegridad);
+  if (!llavePublica || !secretoIntegridad || !deps.sitioUrl) {
     console.error('Faltan secretos de Wompi o SITIO_URL en la función.');
     return {
       estado: 500,
       cuerpo: { error: 'El pago en línea todavía no está configurado.' },
+    };
+  }
+  const problema = problemaEnLlaves(llavePublica, secretoIntegridad);
+  if (problema) {
+    console.error('Llaves de Wompi mal puestas:', problema);
+    return {
+      estado: 500,
+      // En modo de pruebas se dice qué está mal; en producción, no.
+      cuerpo: {
+        error: llavePublica.startsWith('pub_test_')
+          ? `Revisa los secretos de Wompi: ${problema}`
+          : 'El pago en línea todavía no está configurado.',
+      },
     };
   }
 
@@ -110,11 +157,25 @@ export async function iniciarPago(
     referencia: datos.referencia,
     montoEnCentavos: datos.monto_en_centavos,
     moneda: datos.moneda,
-    secreto: deps.secretoIntegridad,
+    secreto: secretoIntegridad,
   });
+  // Para revisar un "La firma es inválida" de Wompi: nada de esto es secreto
+  // (del secreto solo se anota su tipo y su largo, que ya se comprobó que
+  // empieza por test_integrity_ o prod_integrity_).
+  console.log(
+    'Pago Wompi:',
+    JSON.stringify({
+      referencia: datos.referencia,
+      monto_en_centavos: datos.monto_en_centavos,
+      moneda: datos.moneda,
+      tipo_de_secreto: secretoIntegridad.split('_').slice(0, 2).join('_'),
+      largo_del_secreto: secretoIntegridad.length,
+      firma_comienza: firma.slice(0, 8),
+    }),
+  );
   const sitio = deps.sitioUrl.replace(/\/+$/, '');
   const url = urlCheckout({
-    llavePublica: deps.llavePublica,
+    llavePublica,
     referencia: datos.referencia,
     montoEnCentavos: datos.monto_en_centavos,
     moneda: datos.moneda,
