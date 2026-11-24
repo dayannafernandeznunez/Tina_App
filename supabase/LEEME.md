@@ -101,44 +101,59 @@ tienda y pon la *URL de Eventos* también en el ambiente de producción de Wompi
 - Un pedido que se queda sin pagar **no se cancela solo**: tiene el stock
   apartado hasta que la vendedora lo cancele desde el panel.
 
-## Aviso por WhatsApp de los pedidos
+## Aviso de los pedidos nuevos (correo y WhatsApp)
 
-Cada pedido nuevo te llega por WhatsApp con la clienta (y un enlace para
-escribirle), los artículos, el total, la dirección y, si es contraentrega, el
-recordatorio de coordinar la transferencia:
+Cada pedido nuevo te llega con la clienta (nombre, teléfono, correo y un enlace
+para escribirle por WhatsApp), los artículos, el total, la dirección y, si es
+contraentrega, el recordatorio de coordinar la transferencia:
 
 - **Contraentrega:** el aviso sale apenas la clienta hace el pedido.
 - **Pago con Wompi:** sale cuando Wompi confirma el pago (no antes).
 - Un pedido cancelado no se avisa, y cada pedido se avisa **una sola vez**.
 
-Lo manda la función `avisar-pedido` por **CallMeBot**, un servicio gratis que
-escribe a tu propio WhatsApp (solo sirve para recibir los avisos tú; es de uso
-personal y no oficial, así que si algún día deja de funcionar, la tienda sigue
-igual y los pedidos se ven en el panel).
+Lo manda la función `avisar-pedido`, por **correo** (con Resend), por **WhatsApp**
+(con CallMeBot) o por los dos: se usan los canales que tengan sus secretos
+puestos. Si faltan, la tienda funciona igual y los pedidos se ven en el panel.
 
-### Activarlo
+### Correo (Resend)
 
-1. **Ejecuta el script 9** en el *SQL Editor*.
-2. **Activa CallMeBot** (una sola vez): guarda el contacto **+34 644 44 21 48**
-   en tu celular, escríbele por WhatsApp exactamente `I allow callmebot to send me
-   messages` y espera su respuesta: trae tu **clave** (si no llega en 2 minutos,
-   se reintenta a las 24 horas).
-3. **Guarda dos secretos** en *Edge Functions* → *Secrets*:
+1. **Ejecuta el script 9** (`20261119000007_aviso_whatsapp.sql`) en el *SQL Editor*,
+   si todavía no lo has hecho. Sirve para los dos canales.
+2. **Crea tu cuenta en Resend** (resend.com) **con el correo donde quieres
+   recibir los avisos.** Importante: sin verificar un dominio, Resend solo deja
+   escribirle al correo con el que te registraste.
+3. **Crea una clave:** *API Keys* → *Create API Key*, ponle un nombre (por ejemplo
+   `tina`), permiso **Sending access**, y copia la clave (empieza por `re_`). Solo
+   se muestra una vez.
+4. **Guarda dos secretos** en *Edge Functions* → *Secrets*:
 
    | Nombre | Valor |
    |---|---|
-   | `VENDEDORA_TELEFONO` | Tu número con el código del país, por ejemplo `+573001234567`. |
-   | `CALLMEBOT_APIKEY` | La clave que te respondió CallMeBot. |
+   | `RESEND_API_KEY` | La clave de Resend (`re_…`). |
+   | `VENDEDORA_CORREO` | Tu correo, **el mismo de tu cuenta de Resend**. |
 
-4. **Crea la función `avisar-pedido`** igual que las otras (*Via Editor*, con el
-   contenido de `functions/avisar-pedido/index.ts` y *Verify JWT* apagado).
-5. **Vuelve a desplegar `wompi-eventos`** con el `index.ts` nuevo: ahora avisa
-   cuando se aprueba un pago.
-6. **Prueba:** haz una compra con contraentrega en Cali. En unos segundos debe
-   llegarte el mensaje.
+5. **Crea la función `avisar-pedido`**: *Edge Functions* → *Deploy a new function*
+   → *Via Editor*, con el nombre exacto `avisar-pedido`, el archivo `index.ts` con
+   el contenido de `functions/avisar-pedido/index.ts`, y *Verify JWT* apagado.
+   Si ya la tenías creada, pega el código nuevo y despliega otra vez.
+6. **Prueba:** haz una compra con contraentrega en Cali (ciudad "Cali",
+   departamento "Valle del Cauca"). En unos segundos debe llegarte el correo; si
+   no está, mira también la carpeta de spam.
 
-Si faltan los secretos no pasa nada malo: la tienda funciona y simplemente no se
-avisa. Si no llega el mensaje, mira los *Logs* de `avisar-pedido`.
+Límites: el plan gratis de Resend permite 100 correos al día. Los correos salen de
+`onboarding@resend.dev` (el remitente de pruebas de Resend). Para que salgan de
+una dirección propia, como `avisos@tina.co`, hay que verificar un dominio en
+Resend y poner el secreto opcional `CORREO_REMITENTE` (`Tina <avisos@tina.co>`).
+
+### WhatsApp (CallMeBot, opcional)
+
+Gratis y no oficial: escribe a tu propio WhatsApp, pero a veces no responde con
+la clave. Se activa guardando el contacto **+34 644 44 21 48** y escribiéndole
+`I allow callmebot to send me messages`; te responde con una clave (si no llega en
+2 minutos, se reintenta a las 24 horas). Después se guardan los secretos
+`VENDEDORA_TELEFONO` (tu número con +57) y `CALLMEBOT_APIKEY`.
+
+Si no llega el aviso por ningún canal, mira los *Logs* de `avisar-pedido`.
 
 ## Qué nunca se sube a GitHub
 

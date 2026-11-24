@@ -35,6 +35,14 @@ nuevo (lee los archivos `.ts` directamente):
 node prueba_wompi.mjs
 ```
 
+`prueba_canales.mjs` prueba los canales de aviso (correo con Resend y WhatsApp
+con CallMeBot) tal como corren dentro de Supabase, simulando la red: qué llamadas
+hace, a quién escribe y qué pasa si un canal falla:
+
+```bash
+node prueba_canales.mjs
+```
+
 `prueba_aviso.mjs` prueba la función `avisar-pedido` (cómo se escribe el mensaje,
 quién puede pedir un aviso, qué pasa si falla el envío) y que un pago aprobado
 de Wompi dispare el aviso:

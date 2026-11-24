@@ -3,8 +3,10 @@
 //
 //   node prueba_aviso.mjs
 import {
+  armarAsunto,
   armarMensaje,
   avisarPedido,
+  paraCorreo,
   pesos,
   telefonoParaWhatsApp,
 } from '../functions/avisar-pedido/index.ts';
@@ -84,16 +86,25 @@ const muchas = armarMensaje({
 });
 igual('con muchos artículos resume los últimos', [muchas.includes('Pieza 10'), muchas.includes('Pieza 11'), muchas.includes('y 3 más')], [true, false, true]);
 
+console.log('\n--- El correo');
+igual('el asunto dice pedido, forma de pago, total y clienta', armarAsunto(pedidoWompi), 'Nuevo pedido TINA-0012 (pagado) · $41.000 · Laura Caicedo');
+igual('en contraentrega el asunto lo dice', armarAsunto(pedidoContraentrega), 'Nuevo pedido TINA-0013 (contraentrega) · $40.000 · Laura Caicedo');
+const cuerpoCorreo = paraCorreo(m);
+igual('el correo no lleva los asteriscos del formato de WhatsApp', [m.includes('*'), cuerpoCorreo.includes('*')], [true, false]);
+igual('pero conserva todo el contenido', [cuerpoCorreo.includes('Total: $41.000'), cuerpoCorreo.includes('Correo: laura@correo.com'), cuerpoCorreo.includes('Calle 5 #38-20')], [true, true, true]);
+
 console.log('\n--- Avisar de un pedido');
 const llamadas = [];
 const enviados = [];
+const asuntos = [];
 const deps = (extra = {}) => {
   llamadas.length = 0;
   enviados.length = 0;
+  asuntos.length = 0;
   return {
     llaveServicio: LLAVE_SERVICIO,
     configurado: true,
-    enviar: async (texto) => { enviados.push(texto); },
+    enviar: async (texto, asunto) => { enviados.push(texto); asuntos.push(asunto); },
     rpc: async (nombre, args) => {
       llamadas.push([nombre, args]);
       return nombre === 'reclamar_aviso_pedido' ? { datos: pedidoContraentrega, error: null } : { datos: null, error: null };
@@ -106,6 +117,7 @@ let r = await avisarPedido({ id_pedido: 13, token: TOKEN }, null, deps());
 igual('con la llave del pedido manda el aviso', [r.estado, r.cuerpo.enviado, enviados.length], [200, true, 1]);
 igual('pide a la base de datos con la llave de ese pedido', llamadas[0], ['reclamar_aviso_pedido', { p_id: 13, p_token: TOKEN }]);
 igual('el mensaje enviado es el del pedido', enviados[0].includes('TINA-0013'), true);
+igual('y se manda también el asunto del correo', asuntos[0], 'Nuevo pedido TINA-0013 (contraentrega) · $40.000 · Laura Caicedo');
 
 r = await avisarPedido({ id_pedido: 12 }, `Bearer ${LLAVE_SERVICIO}`, deps());
 igual('el servidor, con su llave, avisa sin llave de pedido', [r.estado, r.cuerpo.enviado], [200, true]);

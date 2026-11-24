@@ -221,11 +221,10 @@ test/            Pruebas de datos, lógica, componentes, ingreso, panel y recorr
   el panel. Falta que se venzan solos.
 - **Apple Pay:** necesita una pasarela distinta de Wompi (se está evaluando
   Kushki, que lo tiene en beta para Colombia, solo con Visa y Mastercard).
-- **Aviso por WhatsApp:** el código está listo y probado (CallMeBot, a tu
-  propio número), pero hay que activarlo en Supabase: script 9, los secretos
-  `VENDEDORA_TELEFONO` y `CALLMEBOT_APIKEY` y la función `avisar-pedido` (ver
-  [`supabase/LEEME.md`](supabase/LEEME.md)). CallMeBot es un servicio gratis no
-  oficial; para algo más sólido se puede pasar a la API oficial de WhatsApp.
+- **Aviso de pedidos nuevos:** el código está listo y probado (por correo con
+  Resend y/o por WhatsApp con CallMeBot), pero hay que activarlo en Supabase:
+  script 9, los secretos del canal que uses y la función `avisar-pedido` (ver
+  [`supabase/LEEME.md`](supabase/LEEME.md)).
 - **Guía del pedido** para imprimir o descargar desde el panel.
 - **Categorías:** hoy hay 4 y no se pueden crear nuevas desde el panel.
 - **Publicación:** la app todavía no está publicada en internet.
