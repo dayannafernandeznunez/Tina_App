@@ -14,7 +14,7 @@ comprobantes, envíos, historial).
 | Cuentas e ingreso (clientas y administradora) | **Reales**: Supabase Auth, un solo ingreso para todas |
 | Pedidos (crear, ver, cambiar estado), stock, descuentos y envío | **Reales**: los crea y calcula Supabase |
 | Contraentrega en Cali | **Real**: pedido pendiente que se coordina por WhatsApp |
-| Pago en línea con Wompi | **Conectado, en modo de pruebas**: la app lleva a la página de pago, Wompi avisa a una función de Supabase y el pedido pasa a "Pagado". Falta activarlo en tu proyecto (ver [`supabase/LEEME.md`](supabase/LEEME.md)) y pasar a producción |
+| Pago en línea con Wompi | **En modo de pruebas**: la tienda crea el pedido, lleva a la página de pago de Wompi y el pago de prueba se aprueba (ver [la sección de pasarela de pago](#pasarela-de-pago-modo-de-pruebas)). Falta confirmar que el aviso de Wompi marque el pedido como "Pagado" por sí solo, y pasar a producción |
 
 Sin conexión, o en las pruebas, la app usa **datos de ejemplo** coherentes con
 el modelo.
@@ -54,6 +54,28 @@ La URL del proyecto y la llave pública están en `lib/config/supabase_config.da
 Esa llave está hecha para ir dentro de la app: **lo que protege los datos son las
 reglas de seguridad de la base de datos**, no esconderla. La llave `service_role`
 o `secret` nunca debe estar en el repositorio.
+
+## Pasarela de pago: modo de pruebas
+
+La integración con la pasarela de pago **Wompi** está en **modo de pruebas**
+(*sandbox*): no se mueve dinero real y se paga con tarjetas de prueba. La
+captura es de un pago de prueba aprobado en la página de Wompi, con su letrero
+"Modo de pruebas":
+
+![Pago aprobado en la pasarela de Wompi, en modo de pruebas](docs/imagenes/pago-modo-de-pruebas.png)
+
+Qué está probado y qué falta:
+
+- **Funciona:** la tienda crea el pedido, genera el enlace de pago con la firma de
+  integridad y lleva a la clienta a la página de Wompi, donde el pago de prueba
+  (tarjeta `4242 4242 4242 4242`) se aprueba.
+- **Falta confirmar:** que el aviso que manda Wompi a la tienda marque el pedido
+  como "Pagado" automáticamente, y que al volver a la tienda se vea la
+  confirmación.
+- **Para producción:** cambiar las llaves y los secretos de pruebas por los de
+  producción y poner la dirección real de la tienda.
+
+Los pasos para activarlo están en [`supabase/LEEME.md`](supabase/LEEME.md).
 
 ## Ingreso único y panel de la vendedora
 
@@ -186,10 +208,10 @@ test/            Pruebas de datos, lógica, componentes, ingreso, panel y recorr
 
 ## Pendientes
 
-- **Pago en línea con Wompi:** el código está listo y probado, pero hay que
-  activarlo en Supabase (script 7, cuatro secretos, dos funciones y la *URL de
-  Eventos* en Wompi; ver [`supabase/LEEME.md`](supabase/LEEME.md)), probarlo con
-  las tarjetas de pruebas y luego pasar a las llaves de producción.
+- **Pago en línea con Wompi:** está en modo de pruebas y el pago de prueba se
+  aprueba. Falta que el aviso de Wompi marque el pedido como "Pagado" (ver
+  [`supabase/LEEME.md`](supabase/LEEME.md)) y luego pasar a las llaves de
+  producción.
 - **Pedidos sin pagar:** si una clienta no termina de pagar en Wompi, el pedido
   queda pendiente con el stock apartado hasta que la vendedora lo cancele desde
   el panel. Falta que se venzan solos.
