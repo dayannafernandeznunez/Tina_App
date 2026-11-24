@@ -7,6 +7,7 @@ import '../data/administradora.dart';
 import '../data/catalogo.dart';
 import '../data/pedidos.dart';
 import '../data/sesion.dart';
+import '../data/suscripcion.dart';
 import '../data/datos_simulados.dart';
 import '../logic/calculos.dart';
 import '../logic/borrador_producto.dart';
@@ -82,6 +83,7 @@ class TinaScreen extends StatefulWidget {
     this.sesiones,
     this.pedidos,
     this.admin,
+    this.suscripciones,
     this.pagoEnLinea = false,
     this.selectorFotos = const SelectorFotosDispositivo(),
     this.abrirUrl = abrirEnLaMismaPestana,
@@ -98,6 +100,9 @@ class TinaScreen extends StatefulWidget {
 
   /// Cuánto se espera entre una consulta y otra del estado del pago.
   final Duration pausaSondeo;
+
+  /// Guardar los correos de la suscripción. Si es `null`, no se guarda nada.
+  final SuscripcionRepositorio? suscripciones;
 
   /// De dónde se lee el catálogo (categorías, productos, variantes, promociones
   /// y fotos). Si es `null`, la app trabaja solo con los datos simulados.
@@ -180,6 +185,12 @@ class _TinaScreenState extends State<TinaScreen> {
   String _coleccionSubtitulo = '';
   int? _coleccionEditando;
   int? _coleccionPorBorrar;
+
+  // Suscripción por correo del pie de página.
+  String _suscripcionCorreo = '';
+  bool _suscribiendo = false;
+  bool _suscrita = false;
+  String? _suscripcionError;
 
   // La colección que se está viendo (null = una categoría) y lo que se busca.
   int? _coleccionActiva;
@@ -285,7 +296,41 @@ class _TinaScreenState extends State<TinaScreen> {
     onCharmBar: _abrirCharmBar,
     onColecciones: _colecciones.any((c) => c.activa) ? _irColecciones : null,
     onBuscar: _irBuscar,
+    suscripcion: DatosSuscripcion(
+      correo: _suscripcionCorreo,
+      onCorreo: (v) => setState(() {
+        _suscripcionCorreo = v;
+        _suscripcionError = null;
+      }),
+      onEnviar: _suscribirse,
+      ocupado: _suscribiendo,
+      hecho: _suscrita,
+      error: _suscripcionError,
+    ),
   );
+
+  Future<void> _suscribirse() async {
+    final correo = _suscripcionCorreo.trim();
+    final problema = Validaciones.correo(correo);
+    if (problema != null) {
+      setState(() => _suscripcionError = problema);
+      return;
+    }
+    if (_suscribiendo) return;
+    setState(() => _suscribiendo = true);
+    try {
+      await widget.suscripciones?.suscribir(correo);
+      if (!mounted) return;
+      setState(() {
+        _suscrita = true;
+        _suscripcionError = null;
+      });
+    } on ErrorSuscripcion catch (e) {
+      if (mounted) setState(() => _suscripcionError = e.mensaje);
+    } finally {
+      if (mounted) setState(() => _suscribiendo = false);
+    }
+  }
 
   /// Los productos de la lista que se está viendo: una colección o una
   /// categoría.

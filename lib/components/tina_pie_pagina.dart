@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../config/tienda_config.dart';
 import '../theme/tina_tema.dart';
 import '../utils/abrir_url.dart';
+import 'tina_boton.dart';
+import 'tina_campo.dart';
 import 'tina_enlaces.dart';
 import 'tina_hover.dart';
 import 'tina_logo.dart';
@@ -105,6 +107,11 @@ class TinaPiePagina extends StatelessWidget {
             ),
         ],
       ),
+      if (enlaces.suscripcion != null)
+        _Columna(
+          titulo: 'Suscríbete',
+          hijos: [_Suscripcion(datos: enlaces.suscripcion!)],
+        ),
       if (redes.isNotEmpty)
         _Columna(
           titulo: 'Escríbenos y síguenos',
@@ -237,6 +244,57 @@ class _Enlace extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Un correo para enterarse primero de lo nuevo.
+class _Suscripcion extends StatelessWidget {
+  const _Suscripcion({required this.datos});
+
+  final DatosSuscripcion datos;
+
+  @override
+  Widget build(BuildContext context) {
+    if (datos.hecho) {
+      return Text(
+        '¡Listo! Te escribiremos cuando haya novedades.',
+        key: const ValueKey('suscripcion-hecha'),
+        style: TinaTipografia.estilo(
+          tamano: 14,
+          peso: FontWeight.w800,
+          color: TinaColores.naranja,
+          altura: 1.4,
+        ),
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      spacing: 10,
+      children: [
+        Text(
+          'Entérate primero de lo nuevo y de los lanzamientos.',
+          style: TinaTipografia.estilo(
+            tamano: 14,
+            color: TinaColores.marron,
+            altura: 1.4,
+          ),
+        ),
+        TinaCampo(
+          key: const ValueKey('suscripcion-correo'),
+          etiqueta: 'Tu correo',
+          placeholder: 'nombre@correo.com',
+          tipo: TipoCampo.correo,
+          valor: datos.correo,
+          textoError: datos.error,
+          onChanged: datos.onCorreo,
+        ),
+        TinaBoton(
+          key: const ValueKey('suscripcion-enviar'),
+          etiqueta: datos.ocupado ? 'Enviando…' : 'Suscribirme',
+          onPressed: datos.ocupado ? () {} : datos.onEnviar,
+        ),
+      ],
     );
   }
 }

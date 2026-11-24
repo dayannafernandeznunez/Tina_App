@@ -6,6 +6,7 @@ import 'data/administradora.dart';
 import 'data/catalogo.dart';
 import 'data/pedidos.dart';
 import 'data/sesion.dart';
+import 'data/suscripcion.dart';
 import 'screens/tina_screen.dart';
 import 'theme/tina_tema.dart';
 import 'utils/abrir_url.dart';
@@ -22,6 +23,7 @@ Future<void> main() async {
       sesiones: SesionSupabase(),
       pedidos: PedidosSupabase(),
       admin: AdministradoraSupabase(),
+      suscripciones: SuscripcionSupabase(),
       // El pago en línea pasa por las funciones del servidor de Supabase
       // (iniciar-pago y wompi-eventos); ver supabase/LEEME.md para activarlas.
       pagoEnLinea: true,
@@ -41,6 +43,7 @@ class TinaApp extends StatelessWidget {
     this.sesiones,
     this.pedidos,
     this.admin,
+    this.suscripciones,
     this.pagoEnLinea = false,
     this.selectorFotos = const SelectorFotosDispositivo(),
     this.abrirUrl = abrirEnLaMismaPestana,
@@ -58,6 +61,10 @@ class TinaApp extends StatelessWidget {
   final Duration pausaSondeo;
 
   final CatalogoRepositorio? catalogo;
+
+  /// Guardar los correos de quienes se suscriben. Sin él, la suscripción
+  /// funciona en modo de ejemplo (no se guarda en ningún lado).
+  final SuscripcionRepositorio? suscripciones;
 
   /// El inicio de sesión (clientas y administradora). Sin él, las cuentas son
   /// de ejemplo.
@@ -86,6 +93,7 @@ class TinaApp extends StatelessWidget {
         pedidos: pedidos,
         pagoEnLinea: pagoEnLinea,
         admin: admin,
+        suscripciones: suscripciones,
         selectorFotos: selectorFotos,
         abrirUrl: abrirUrl,
         urlInicial: urlInicial,

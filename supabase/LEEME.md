@@ -16,6 +16,7 @@ de tu proyecto en Supabase.
 | 7 | `migrations/20261118000005_pago_wompi.sql` | Pago en línea: cada pedido tiene su llave (`token_publico`), los intentos de pago y las funciones que usan las funciones del servidor para iniciar el pago, recibir el aviso de Wompi y consultar o cancelar un pedido. |
 | 8 | `migrations/20261119000006_fotos_por_color.sql` | Cada foto de un producto puede ser de un color: al elegir ese color en la tienda se ven sus fotos. |
 | 9 | `migrations/20261119000007_aviso_whatsapp.sql` | Aviso por WhatsApp: marca cada pedido como avisado (para no repetirlo) y arma lo que lleva el mensaje. |
+| 10 | `migrations/20261124000008_charm_bar_y_colecciones.sql` | Charm Bar (categorías Charm Bar y Charms con un collar base y 8 charms de ejemplo, ocultos y sin stock), colecciones, suscripción por correo y lugares para las fotos del Charm Bar. |
 
 Los scripts nuevos se agregan al final: si ya ejecutaste los anteriores, solo
 ejecuta los que falten, en orden. La prueba de que funcionan está en
@@ -100,6 +101,34 @@ tienda y pon la *URL de Eventos* también en el ambiente de producción de Wompi
   `wompi-eventos` (un aviso con firma mala responde 401).
 - Un pedido que se queda sin pagar **no se cancela solo**: tiene el stock
   apartado hasta que la vendedora lo cancele desde el panel.
+
+## Charm Bar: cómo dejarlo listo
+
+El script 10 deja el Charm Bar armado pero **escondido**: el collar base y los 8
+charms de ejemplo están ocultos y sin stock, para que no se vea nada a medias.
+Cuando quieras abrirlo, en el panel, en **Productos**:
+
+1. Edita **Collar Charm Bar**: ponle el precio, el **stock de cada color y de
+   cada modo** (charms fijos y removibles), la foto de portada y las fotos de
+   cada color, y déjalo **Visible**.
+2. Edita cada **Charm** (Charm Corazón, Charm Flor...): precio, stock, foto, y
+   déjalo **Visible**. Puedes crear más con **Nuevo producto** en la categoría
+   *Charms*; cada uno es un charm que la clienta puede elegir.
+3. En **Fotos del sitio** hay dos lugares nuevos: el **banner "Arma tu collar"**
+   de la portada y la **foto grande del Charm Bar**.
+
+Hasta que haya un collar visible con stock y al menos un charm con stock, la
+página del Charm Bar muestra "abre muy pronto".
+
+## Colecciones y suscripciones
+
+- **Colecciones:** en el panel, sección **Colecciones**, las creas, les pones
+  foto y las muestras u ocultas. A cada producto le asignas su colección en el
+  editor de productos. Una colección solo aparece en la tienda si está visible.
+- **Suscripciones:** los correos que deja la gente en el pie de página quedan en
+  *Table Editor* → `suscripcion`. Solo tú los ves.
+- **WhatsApp y redes de la tienda:** se escriben en `lib/config/tienda_config.dart`
+  (número de WhatsApp con el código del país, usuario de Instagram, TikTok).
 
 ## Aviso de los pedidos nuevos (correo y WhatsApp)
 

@@ -90,7 +90,7 @@ Hay **un solo ingreso** (Cuenta → Iniciar sesión) para clientas y administrad
 - Las clientas se registran desde el mismo formulario. Si Supabase tiene activada
   la confirmación de correo, la app avisa que hay que confirmarlo.
 
-El panel tiene cinco secciones:
+El panel tiene seis secciones:
 
 1. **Pedidos:** filtra por estado y cámbialos; cada cambio queda en el historial.
    Al abrir un pedido ves el **contacto de la clienta** (nombre, teléfono y
@@ -111,15 +111,44 @@ El panel tiene cinco secciones:
    en la tienda ve esas fotos, y si el color no tiene, ve la portada. Las fotos
    se suben al guardar. Un producto no se borra, se oculta; una fila que ya
    tiene pedidos tampoco se borra, se deja con stock 0.
-4. **Fotos de artículos:** elige un artículo; sube, ordena, haz principal o borra
+4. **Colecciones:** crea colecciones (grupos de productos con nombre, subtítulo y
+   foto), edítalas, muéstralas u ocúltalas y bórralas. A cada producto se le
+   asigna su colección en el editor de productos.
+5. **Fotos de artículos:** elige un artículo; sube, ordena, haz principal o borra
    sus fotos generales (la portada). La primera es la que se ve en la tienda.
-5. **Fotos del sitio:** cambia o quita la foto de cada lugar de la página. Por
+6. **Fotos del sitio:** cambia o quita la foto de cada lugar de la página. Por
    ahora solo la **portada del inicio** se muestra en la tienda; el logo, el
    banner de mayoreo y el fondo ya se pueden preparar, pero todavía no se ven.
 
 Solo la administradora puede cambiar productos, stock y fotos: las reglas de
 seguridad de Supabase rechazan cualquier cambio sin su sesión, aunque se llame
 directo a la base de datos.
+
+## La tienda
+
+El diseño toma la estructura de una tienda de accesorios bien organizada, pero
+con la identidad de Tina (su naranja, sus manchas, sus estrellas y su grano):
+
+- **Portada:** franja de promoción, cabecera, portada de marca con "Comprar
+  ahora", cinta de confianza, categorías en círculos con foto, una sección de
+  productos por categoría, mosaico de categorías, colecciones, banner "Arma tu
+  collar", beneficios, garantías y pie de página.
+- **Catálogo:** filtros por disponibilidad, color (con cantidad) y precio, y
+  orden por precio o nombre.
+- **Producto:** fotos por color, miniaturas, migas de pan y pestañas de
+  descripción, envíos y cuidados.
+- **Buscador:** por nombre, categoría, color, colección y descripción.
+- **Charm Bar:** la clienta arma su collar en cuatro pasos (color, cuántos
+  charms, si van fijos o removibles, y cuáles). El collar y cada charm van al
+  carrito como productos normales y descuentan su propio stock. El collar base
+  es un producto de la categoría "Charm Bar" (cada color y modo es una
+  variante) y los charms son productos de la categoría "Charms"; ambos se
+  crean y se activan desde el panel.
+- **Suscripción:** en el pie de página la clienta deja su correo; la lista queda
+  en la tabla `suscripcion` de Supabase, que solo ve la administradora.
+
+El número de WhatsApp y las redes de la tienda están en
+`lib/config/tienda_config.dart`: lo que quede vacío no se muestra.
 
 ## Diseño para PC y para celular
 
@@ -226,7 +255,12 @@ test/            Pruebas de datos, lógica, componentes, ingreso, panel y recorr
   script 9, los secretos del canal que uses y la función `avisar-pedido` (ver
   [`supabase/LEEME.md`](supabase/LEEME.md)).
 - **Guía del pedido** para imprimir o descargar desde el panel.
-- **Categorías:** hoy hay 4 y no se pueden crear nuevas desde el panel.
+- **Categorías nuevas:** las de Charm Bar y Charms vienen en el script 10; otras
+  categorías todavía no se pueden crear desde el panel.
+- **Fotos por poner:** el Charm Bar necesita las fotos del collar y de cada
+  charm, y los lugares "Banner Charm Bar" y "Foto del Charm Bar" en Fotos del
+  sitio; las colecciones, su foto.
+- **Reseñas y prueba social:** falta tener reseñas reales para mostrarlas.
 - **Publicación:** la app todavía no está publicada en internet.
 - **Diseño:** pendiente darle un aspecto más artesanal, hecho a mano, con las
   fotos reales de las piezas.
